@@ -35,15 +35,20 @@ Built with Three.js + Vite + TypeScript. See [PLAN.md](PLAN.md) for the design b
   - a scanned human head, for studying light patterns on a real face
   - a marble bust
 
-  Turn control for all of them. Depth props: a foreground plant, a second
+  Turn control for all of them. Seated poses sit on apple boxes, the plywood
+  boxes portrait studios use. Depth props: a foreground plant, a second
   mannequin, string lights and street lamps for bokeh. Subject-to-backdrop
   distance.
 - **Environments**:
-  - **Studio**: cyclorama in white, gray, black or a colour. Room light comes
-    from a real studio HDRI.
-  - **Open sky**: simulated sun and sky with time of day, sun direction,
-    clear / hazy / overcast / open shade, haze, twilight and night. Kenney
-    trees and hedges.
+  - **Studio**: a seamless paper backdrop as it stands in a real studio: a
+    2.72 m roll (3.55 m for groups) on a crossbar between two stands, hanging
+    down and sweeping across the floor, in any colour. It stands inside the
+    real Photo Studio Loft room, projected and relightable like the locations;
+    **Room light** sets how much of the room's own light gets in. The room
+    moves with the paper, so the subject can stand up to 4.5 m from it.
+  - **Open sky** (simulated sun and sky) is hidden for now: without realistic
+    surroundings it was a flat plane. Its code stays wired up for when real
+    outdoor settings arrive.
   - **Location**: six real HDRI panoramas (studio loft, artist workshop,
     meadow, Venice sunset, park, city rooftop at night), calibrated to real lux.
     Each sun is extracted into a shadow-casting light you can rotate around the
@@ -59,7 +64,13 @@ Built with Three.js + Vite + TypeScript. See [PLAN.md](PLAN.md) for the design b
   hour, overcast, midday + fill flash, open shade, blue hour + strobe, night bokeh).
 - Top-view setup diagram (drag lights), click lights in 3D to move them with a
   gizmo, and **Save photo** to download a PNG.
-- **Tutorial**: a 22-step guided tour from the header that opens each page,
+- **Keyboard shortcuts**: press `?` or the keyboard button in the header for
+  the list. Pages (1–6), pick and move lights (K F R B, arrows, Shift+arrows,
+  + −, O, S), aperture ([ ]), lens (, .), framing (C), autofocus (A),
+  exposure mode (E), focus zone (Z), stands (G), top view (D), save (P).
+- **Link previews**: `public/og-image.jpg` (1200×630, rendered in the app) and
+  Open Graph / Twitter tags in `index.html`, for Discord, iMessage and others.
+- **Tutorial**: a 23-step guided tour from the header that opens each page,
   highlights each control and explains it. Controls stay usable while
   highlighted, and many steps suggest something to try.
 
@@ -111,3 +122,5 @@ Pushing to `main` deploys to GitHub Pages via `.github/workflows/pages.yml`.
 | `src/diagram.ts` | Top-down lighting diagram |
 | `src/ui.ts` | Small DOM control kit |
 | `src/tour.ts`, `src/tutorial.ts` | Guided tour overlay and its steps |
+| `src/shortcuts.ts` | Keyboard shortcut list and panel (keys handled in `app.ts`) |
+| `src/backdrop.ts` | Seamless paper backdrop, roll, crossbar and stands |

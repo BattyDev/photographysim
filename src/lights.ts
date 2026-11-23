@@ -1,4 +1,5 @@
 // Studio lights: a shadow-casting spotlight dressed with a visible modifier and stand.
+import { MAX_BACKDROP_DISTANCE } from './backdrop';
 import * as THREE from 'three';
 import { MODIFIERS, type LightState, type ModifierSpec, type SimState } from './state';
 import { kelvinLinear, type Exposure } from './world';
@@ -25,7 +26,7 @@ export function lightPosition(ls: LightState, eye: THREE.Vector3, out = new THRE
 
 export function lightTarget(ls: LightState, s: SimState, eye: THREE.Vector3, pos: THREE.Vector3, out = new THREE.Vector3()) {
   if (ls.aim === 'background') {
-    const z = s.env.mode === 'studio' ? -s.subject.backgroundDistance : eye.z - 4;
+    const z = s.env.mode === 'studio' ? -Math.min(s.subject.backgroundDistance, MAX_BACKDROP_DISTANCE) : eye.z - 4;
     return out.set(pos.x * 0.3, 1.1, z);
   }
   return out.copy(eye);

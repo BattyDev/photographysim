@@ -190,9 +190,14 @@ export class ProjectedLocation {
     }
   }
 
-  /** Scale for exposure (cont = X·t) and turn the place by `rot` radians. */
-  update(cont: number, rot: number) {
+  /**
+   * Scale for exposure (cont = X·t), turn the place by `rot` radians and shift
+   * it by `offset` (the whole room moves rigidly, so the projection still holds).
+   */
+  update(cont: number, rot: number, offset?: THREE.Vector3) {
     this.group.rotation.y = rot;
+    if (offset) this.group.position.copy(offset);
+    else this.group.position.set(0, 0, 0);
     for (const s of this.surfaces) s.uniforms.projEmit.value = cont;
   }
 

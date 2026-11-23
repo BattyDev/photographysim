@@ -1,6 +1,7 @@
 // Studio, open-sky and HDRI-location environments, the daylight model, and depth props.
 import * as THREE from 'three';
 import { placedModel } from './assets';
+import { Backdrop, MAX_BACKDROP_DISTANCE, paperWidth } from './backdrop';
 import { HdriLibrary, type HdriData } from './hdri';
 import { kelvinToRGB, srgbToLinear } from './photo';
 import type { LocationId, SimState, Weather } from './state';
@@ -132,50 +133,15 @@ function noiseTexture(base: string, spread: number, size = 256, blades = false):
   return tex;
 }
 
-/** Seamless cyclorama: floor sweeping up into a back wall. */
-function cycloramaGeometry(width = 9, depth = 9, height = 4.5, radius = 1.4): THREE.BufferGeometry {
-  const profile: [number, number][] = [];
-  profile.push([depth, 0]);
-  const steps = 24;
-  for (let i = 0; i <= steps; i++) {
-    const a = (i / steps) * (Math.PI / 2);
-    profile.push([radius - Math.sin(a) * radius, radius - Math.cos(a) * radius]);
-  }
-  profile.push([-0.0001, height]);
-  // profile: [z, y] with z relative to the wall plane (wall at z=0, floor extends +z)
-  const cols = 2;
-  const positions: number[] = [];
-  const indices: number[] = [];
-  for (let p = 0; p < profile.length; p++) {
-    for (let c = 0; c <= cols; c++) {
-      const x = (c / cols - 0.5) * width;
-      positions.push(x, profile[p][1], profile[p][0] - radius + radius);
-    }
-  }
-  for (let p = 0; p < profile.length - 1; p++) {
-    for (let c = 0; c < cols; c++) {
-      const a = p * (cols + 1) + c;
-      const b = a + cols + 1;
-      indices.push(a, a + 1, b, b, a + 1, b + 1);
-    }
-  }
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-  geo.setIndex(indices);
-  geo.computeVertexNormals();
-  return geo;
-}
-
 // ------------------------------------------------------------------ world
 
-/** Kenney Nature Kit trees used to dress the open-sky scene: [file, min scale, max scale]. */
-const TREES: [string, number, number][] = [
-  ['tree_oak', 4.5, 7],
-  ['tree_default', 3.5, 5.5],
-  ['tree_detailed', 4.5, 7],
-  ['tree_fat', 4.5, 6.5],
-  ['tree_tall', 4, 6],
-];
+/**
+ * Where the studio's room sits around the backdrop. The photo studio loft is
+ * turned square to the set (−15° undoes its measured yaw) and moved so its
+ * back wall stands just behind the paper stands. `back` and `cx` are its back
+ * wall and centre line in that turned frame.
+ */
+const STUDIO_ROOM = { rot: -15, back: -3.03, cx: -0.05, behindPaper: 0.75 };
 
 export interface LocationInfo {
   sunElevation: number | null;
@@ -191,8 +157,9 @@ export class World {
   readonly sun = new THREE.DirectionalLight('#ffffff', 0);
   readonly hemi = new THREE.HemisphereLight('#ffffff', '#ffffff', 1);
   readonly sky: THREE.Mesh<THREE.SphereGeometry, THREE.ShaderMaterial>;
-  readonly backdropMat = new THREE.MeshStandardMaterial({ color: '#7a7a7a', roughness: 0.95 });
-  private cyc: THREE.Mesh;
+  readonly backdrop = new Backdrop();
+  /** Holds the projected panorama surfaces of whichever place is showing (studio room or location). */
+  private placeRoot = new THREE.Group();
   private plant = new THREE.Group();
   private figure: Figure | null = null;
   private lamps = new THREE.Group();
@@ -218,7 +185,7 @@ export class World {
     private renderer: THREE.WebGLRenderer,
     private onAssetLoaded: () => void,
   ) {
-    scene.add(this.studio, this.outdoor, this.location, this.props, this.hemi, this.sun, this.sun.target);
+    scene.add(this.studio, this.outdoor, this.location, this.placeRoot, this.props, this.hemi, this.sun, this.sun.target);
     this.hdri = new HdriLibrary(renderer);
 
     // Sky dome (follows the camera, always behind everything).
@@ -245,20 +212,10 @@ export class World {
     this.sky.frustumCulled = false;
     this.outdoor.add(this.sky);
 
-    // Studio cyclorama.
-    this.cyc = new THREE.Mesh(cycloramaGeometry(), this.backdropMat);
-    this.cyc.receiveShadow = true;
-    this.studio.add(this.cyc);
-    const floor = new THREE.Mesh(
-      new THREE.PlaneGeometry(40, 40),
-      new THREE.MeshStandardMaterial({ color: '#2a2826', roughness: 0.9 }),
-    );
-    floor.rotation.x = -Math.PI / 2;
-    floor.position.y = -0.002;
-    floor.receiveShadow = true;
-    this.studio.add(floor);
+    // Studio: a seamless paper backdrop on stands, inside the projected studio room.
+    this.studio.add(this.backdrop.group);
 
-    // Outdoor ground, path, hedge, trees.
+    // Outdoor ground and path.
     const grassTex = noiseTexture('#3d5a2a', 0.6, 256, true);
     grassTex.repeat.set(160, 160);
     const ground = new THREE.Mesh(
@@ -309,7 +266,7 @@ export class World {
         out.push(new THREE.Matrix4().makeTranslation(x, yy, z + Math.sin(i * 1.7) * 0.15));
       }
     };
-    catenary(-3, 3, 2.4, 0.5, 0, 20, this.bulbsStudio);
+    catenary(-1.3, 1.3, 2.3, 0.35, 0, 16, this.bulbsStudio);
     catenary(-5, 0.5, 2.6, 0.55, -7, 20, this.bulbsOutdoor);
     catenary(0.5, 6, 2.6, 0.5, -7.5, 20, this.bulbsOutdoor);
     this.posts = new THREE.Group();
@@ -383,34 +340,29 @@ export class World {
     );
   }
 
-  private async dressOutdoor() {
-    let seed = 42;
-    const rand = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
-    const trees = await Promise.all(TREES.map(([f]) => placedModel(`models/kenney/${f}.glb`)));
-    const bushes = await Promise.all(['plant_bushLarge', 'plant_bushDetailed'].map((f) => placedModel(`models/kenney/${f}.glb`)));
-    const place = (src: THREE.Group, x: number, z: number, scale: number) => {
-      const o = src.clone(true);
-      o.scale.setScalar(scale);
-      o.position.set(x, 0, z);
-      o.rotation.y = rand() * Math.PI * 2;
-      this.outdoor.add(o);
-    };
-    // Hedge rows either side of the path.
-    for (const side of [-1, 1]) {
-      for (let i = 0; i < 9; i++) place(bushes[i % 2], side * (2.4 + i * 1.0 + rand() * 0.2), -9 + (rand() - 0.5) * 0.4, 3.2 + rand() * 0.8);
+  /** Show one place's projected surfaces (or none). */
+  private showPlace(h: HdriData | null) {
+    const g = h?.place.group ?? null;
+    if (this.place !== g) {
+      if (this.place) this.placeRoot.remove(this.place);
+      this.place = g;
+      if (g) this.placeRoot.add(g);
     }
-    for (let i = 0; i < 46; i++) {
-      const z = -11 - rand() * 70;
-      let x = (rand() - 0.5) * (30 + -z * 1.4);
-      if (Math.abs(x) < 2.5) x += Math.sign(x || 1) * 3;
-      const k = Math.floor(rand() * TREES.length);
-      place(trees[k], x, z, THREE.MathUtils.lerp(TREES[k][1], TREES[k][2], rand()));
-    }
-    for (let i = 0; i < 14; i++) {
-      const side = i % 2 ? 1 : -1;
-      const k = Math.floor(rand() * TREES.length);
-      place(trees[k], side * (9 + rand() * 18), 2 - rand() * 12, THREE.MathUtils.lerp(TREES[k][1], TREES[k][2], rand()));
-    }
+    this.placeRoot.visible = !!g;
+  }
+
+  /** Load a place's sharp detail layer once it is on screen. */
+  private wantDetail(id: LocationId) {
+    this.need(`detail:${id}`, () =>
+      this.hdri.loadDetail(id, this.renderer).then(() => {
+        // Moved on while it downloaded: don't keep it.
+        if (this.detailFor !== id) {
+          this.hdri.dropDetail(id);
+          this.requested.delete(`detail:${id}`);
+        }
+      }),
+    );
+    this.detailFor = id;
   }
 
   /** Panorama rotation (rad) that puts the location's sun at the chosen azimuth. */
@@ -440,7 +392,7 @@ export class World {
 
   /** Z position of the studio backdrop wall. */
   backdropZ(s: SimState): number {
-    return -s.subject.backgroundDistance;
+    return -Math.min(s.subject.backgroundDistance, MAX_BACKDROP_DISTANCE);
   }
 
   update(s: SimState, ex: Exposure, camera: THREE.Camera) {
@@ -456,26 +408,32 @@ export class World {
     this.locSunDir = null;
 
     // Keep only the visible location's sharp layer in GPU memory.
-    const want = mode === 'location' ? s.env.location : null;
+    const want: LocationId | null = mode === 'location' ? s.env.location : mode === 'studio' ? 'studio_loft' : null;
     if (this.detailFor && this.detailFor !== want) {
       this.hdri.dropDetail(this.detailFor);
       this.requested.delete(`detail:${this.detailFor}`);
       this.detailFor = null;
     }
-    if (mode === 'studio') this.need('studio_loft', () => this.hdri.load('studio_loft'));
-    if (outdoor) this.need('outdoor', () => this.dressOutdoor());
+    if (want) this.need(`loc:${want}`, () => this.hdri.load(want));
+    if (!want) this.showPlace(null);
     if (s.subject.foregroundProp) this.need('plant', () => this.loadPlant());
     if (s.subject.backgroundFigure) this.need('figure', () => this.loadBackgroundFigure());
     if (s.subject.bokehLights && mode !== 'studio') this.need('lamps', () => this.loadLamps());
 
     if (mode === 'studio') {
       this.daylightCache = null;
-      this.cyc.position.z = bgZ;
-      this.backdropMat.color.set(s.env.backdrop);
+      // The paper runs out across the floor to just past the subject's feet.
+      this.backdrop.update(bgZ, paperWidth(s), Math.min(0.9, bgZ + 3.6), s.env.backdrop);
       this.sun.visible = false;
       this.sun.castShadow = false;
       const room = this.hdri.get('studio_loft');
+      this.showPlace(room ?? null);
       if (room) {
+        // The room moves with the backdrop, so the subject can walk away from it.
+        const r = STUDIO_ROOM;
+        const roomLight = s.env.ambient / room.spec.lux;
+        room.place.update(cont * roomLight, D(r.rot), new THREE.Vector3(-r.cx, 0, bgZ - r.behindPaper - r.back));
+        this.wantDetail('studio_loft');
         this.scene.environment = room.envMap;
         this.scene.environmentIntensity = (s.env.ambient / room.spec.lux) * cont;
         this.scene.environmentRotation.set(0, 0, 0);
@@ -494,30 +452,14 @@ export class World {
       this.hemi.intensity = 0;
       const h = this.hdri.get(s.env.location);
       if (!h) {
-        this.need(`loc:${s.env.location}`, () => this.hdri.load(s.env.location));
         this.scene.background = new THREE.Color(0.02, 0.02, 0.025);
         this.sun.visible = false;
         this.sun.castShadow = false;
-        if (this.place) this.place.visible = false;
+        this.showPlace(null);
       } else {
         const rot = this.locationRotation(s, h);
-        if (this.place !== h.place.group) {
-          if (this.place) this.location.remove(this.place);
-          this.place = h.place.group;
-          this.location.add(h.place.group);
-        }
-        const id = s.env.location;
-        this.need(`detail:${id}`, () =>
-          this.hdri.loadDetail(id, this.renderer).then(() => {
-            // Moved on while it downloaded: don't keep it.
-            if (this.detailFor !== id) {
-              this.hdri.dropDetail(id);
-              this.requested.delete(`detail:${id}`);
-            }
-          }),
-        );
-        this.detailFor = id;
-        h.place.group.visible = true;
+        this.showPlace(h);
+        this.wantDetail(s.env.location);
         h.place.update(cont, rot);
         this.scene.background = null;
         this.scene.environment = h.envMap;
@@ -634,7 +576,7 @@ export class World {
 
   /** Meshes that can be double-clicked to set focus. */
   focusTargets(): THREE.Object3D[] {
-    return [this.studio, this.outdoor, this.location, this.props];
+    return [this.studio, this.outdoor, this.placeRoot, this.props];
   }
 }
 

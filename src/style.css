@@ -1021,3 +1021,21 @@ button.ghost:hover {
     margin-bottom: 6px;
   }
 }
+
+/* Keyboard shortcuts */
+.keys-btn { width: 34px; padding: 0; display: inline-flex; align-items: center; justify-content: center; }
+.keys-overlay { position: fixed; inset: 0; z-index: 60; background: rgba(5, 6, 8, 0.6); display: flex; align-items: center; justify-content: center; padding: 16px; }
+.keys-overlay[hidden] { display: none; }
+.keys-card { background: var(--panel, #16181c); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 18px 20px; max-width: 780px; width: 100%; max-height: 90vh; overflow: auto; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5); }
+.keys-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+.keys-top h3 { margin: 0; font-size: 16px; }
+.keys-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 28px; }
+.keys-grid h4 { color: #f2b544; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; margin: 12px 0 6px; }
+.keys-grid dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; margin: 0; align-items: center; }
+.keys-grid dt { white-space: nowrap; }
+.keys-grid dd { margin: 0; font-size: 12.5px; color: rgba(255, 255, 255, 0.75); }
+.keys-grid kbd { display: inline-block; min-width: 20px; padding: 1px 6px; margin-right: 3px; border: 1px solid rgba(255, 255, 255, 0.22); border-bottom-width: 2px; border-radius: 5px; font: 600 11.5px/1.5 ui-monospace, monospace; text-align: center; color: #fff; background: rgba(255, 255, 255, 0.06); }
+.keys-grid .to, .keys-grid .or { margin: 0 4px 0 1px; font-size: 11px; color: rgba(255, 255, 255, 0.5); }
+.keys-foot { margin: 14px 0 0; font-size: 12px; color: rgba(255, 255, 255, 0.5); }
+@media (max-width: 820px), (pointer: coarse) { .keys-btn { display: none; } }
+@media (max-width: 640px) { .keys-grid { grid-template-columns: 1fr; } }

@@ -32,7 +32,7 @@ export const TUTORIAL: TourStep[] = [
     title: 'Shoots: start here',
     page: 'shoot',
     target: label('Shoots'),
-    body: `<p>Complete, ready-to-shoot setups: <strong>Outdoor solo</strong>, <strong>Outdoor family</strong> and <strong>Indoor</strong>. Each sets the place, the lights and the lens.</p>
+    body: `<p>Complete, ready-to-shoot setups: <strong>Outdoor solo</strong>, <strong>Outdoor family</strong> and <strong>Indoor</strong> (seamless paper in a real studio). Each sets the place, the lights and the lens.</p>
 <p><strong>People</strong> swaps between one person and a family of four. The lights move back and get brighter to cover a group.</p>
 ${tip('switch People to Group and watch where the lights go in the top view.')}`,
   },
@@ -127,14 +127,14 @@ ${tip('on an outdoor shoot, try Tungsten for a blue, moody look.')}`,
     page: 'subject',
     target: pageBody,
     body: `<p>Choose who you're photographing: the mannequin, a scanned real face (best for studying light on skin), or a marble bust.</p>
-<p><strong>Turn</strong> angles them toward or away from the key. In the studio, <strong>Subject to backdrop</strong> controls how dark and blurred the background gets. <strong>Depth props</strong> add things in front and behind to show off depth of field.</p>`,
+<p><strong>Turn</strong> angles them toward or away from the key. In the studio, <strong>Subject to backdrop</strong> controls how dark and blurred the paper gets. <strong>Depth props</strong> add things in front and behind to show off depth of field.</p>`,
   },
   {
     title: 'Scene: where you are',
     page: 'scene',
     target: pageBody,
-    body: `<p><strong>Studio</strong>: a seamless backdrop in any colour. <strong>Open sky</strong>: a simulated sun and sky at any time of day and in any weather. <strong>Location</strong>: six real places, captured as panoramas.</p>
-<p>Locations are real surfaces, so your flash lights up the floor and nearby walls, and the background blurs by its real distance. <strong>Sun direction</strong> turns the whole place around the subject.</p>`,
+    body: `<p><strong>Studio</strong>: seamless paper on stands in a real photo studio, in any colour. <strong>Room light</strong> sets how much of the room's own light gets in. <strong>Location</strong>: six real places, captured as panoramas.</p>
+<p>Both are real surfaces, so your flash lights up the floor and nearby walls, and the background blurs by its real distance. <strong>Sun direction</strong> turns a location around the subject.</p>`,
   },
   {
     title: 'View',
@@ -146,6 +146,11 @@ ${tip('on an outdoor shoot, try Tungsten for a blue, moody look.')}`,
     title: 'Save your photo',
     target: q('.sidebar-header .primary'),
     body: `<p>Renders a high-quality version of the view, with full depth of field, and downloads it as a PNG.</p>`,
+  },
+  {
+    title: 'Keyboard shortcuts',
+    target: q('.keys-btn'),
+    body: `<p>With a keyboard, press <kbd>?</kbd> or this button for the full list. A few favourites: <kbd>K</kbd> <kbd>F</kbd> <kbd>R</kbd> <kbd>B</kbd> pick a light, the arrow keys move it, <kbd>S</kbd> solos it, and <kbd>[</kbd> <kbd>]</kbd> change the aperture.</p>`,
   },
   {
     title: "You're ready",

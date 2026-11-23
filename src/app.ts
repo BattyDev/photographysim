@@ -18,6 +18,7 @@ import {
   formatPower,
   formatShutter,
   meteredAperture,
+  FOCAL_LENGTHS,
   nearest,
   parseShutter,
   stopsToRatio,
@@ -45,10 +46,12 @@ import {
   type SimState,
 } from './state';
 import { LOCATIONS, locationSpec } from './hdri';
+import { MAX_BACKDROP_DISTANCE } from './backdrop';
 import { GROUP_POSES, Subject } from './subject';
 import { Panel, type Pages } from './ui';
 import { Tour } from './tour';
 import { TUTORIAL } from './tutorial';
+import { ShortcutPanel } from './shortcuts';
 import { World, daylight, sunElevation, type Exposure } from './world';
 
 const D = THREE.MathUtils.degToRad;
@@ -113,6 +116,7 @@ export class App {
   private viewport: HTMLElement;
   private nav!: Pages;
   private tour!: Tour;
+  private keys = new ShortcutPanel();
   /** Last framing and camera height picked, highlighted until the user orbits away. */
   private framing: string | null = null;
   private angle: string | null = null;
@@ -195,6 +199,7 @@ export class App {
     this.buildSidebar(sidebar);
 
     this.setupPicking();
+    window.addEventListener('keydown', (e) => this.onKey(e));
     new ResizeObserver(() => this.resize()).observe(this.viewport);
     this.resize();
     // Start on the outdoor solo shoot: only its panorama and the mannequin download up front.
@@ -221,8 +226,7 @@ export class App {
   /** Push the whole state into the scene and refresh the UI. */
   update() {
     const s = this.state;
-    const indoor = s.env.mode === 'studio' || (s.env.mode === 'location' && ['studio_loft', 'workshop'].includes(s.env.location));
-    this.subject.apply(s.subject, indoor);
+    this.subject.apply(s.subject);
     this.subject.eyePosition(this.eye);
 
     this.camera.setFocalLength(s.camera.focalLength);
@@ -486,6 +490,146 @@ export class App {
     this.interact();
   }
 
+  // ----------------------------------------------------------- keyboard
+
+  /** Click a visible button by its text, so a shortcut runs exactly what the button does. */
+  private press(page: string, text: string) {
+    this.nav.show(page);
+    const b = [...document.querySelectorAll<HTMLButtonElement>('.page:not([hidden]) button')].find((x) => x.textContent?.trim() === text);
+    b?.click();
+  }
+
+  private onKey(e: KeyboardEvent) {
+    const t = e.target as HTMLElement | null;
+    if (t?.closest?.('select, textarea, [contenteditable], input:not([type=range]):not([type=checkbox])')) return;
+    const k = e.key;
+    const arrow = k.startsWith('Arrow');
+    if (arrow && t instanceof HTMLInputElement && t.type === 'range') return;
+    if (this.tour.isOpen && (arrow || k === 'Escape')) return;
+    if ((e.ctrlKey || e.metaKey) && k.toLowerCase() === 's') {
+      e.preventDefault();
+      this.savePhoto();
+      this.toastMsg('Saving photo…');
+      return;
+    }
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    const s = this.state;
+    const l = this.sel;
+    const name = `${TAB_NAMES[l.id]} light`;
+    const wrap = (a: number) => ((((a + 180) % 360) + 360) % 360) - 180;
+    const side = (a: number) => (Math.abs(a) < 1 ? 'in front' : `${Math.abs(Math.round(a))}° ${a < 0 ? 'cam-left' : 'cam-right'}`);
+    const step = (list: number[], v: number, d: number) => {
+      let i = 0;
+      list.forEach((x, j) => {
+        if (Math.abs(x - v) < Math.abs(list[i] - v)) i = j;
+      });
+      return list[THREE.MathUtils.clamp(i + d, 0, list.length - 1)];
+    };
+    let msg = '';
+    switch (k.length === 1 ? k.toLowerCase() : k) {
+      case '?':
+      case '/':
+        this.keys.toggle();
+        break;
+      case 'Escape':
+        if (this.keys.isOpen) this.keys.close();
+        else if (this.gizmoActive) this.gizmoActive = false;
+        else return;
+        break;
+      case 't':
+        this.keys.close();
+        this.tour.start();
+        break;
+      case 'p':
+        this.savePhoto();
+        msg = 'Saving photo…';
+        break;
+      case '1': case '2': case '3': case '4': case '5': case '6':
+        this.nav.show(['shoot', 'lights', 'camera', 'subject', 'scene', 'view'][+k - 1]);
+        break;
+      case 'k': case 'f': case 'r': case 'b': {
+        const id = ({ k: 'key', f: 'fill', r: 'rim', b: 'bg' } as const)[k.toLowerCase() as 'k' | 'f' | 'r' | 'b'];
+        s.selectedLight = id;
+        this.nav.show('lights');
+        msg = `${TAB_NAMES[id]} light selected${this.light(id).enabled ? '' : ' (off: press O)'}`;
+        break;
+      }
+      case 'o':
+        l.enabled = !l.enabled;
+        msg = `${name} ${l.enabled ? 'on' : 'off'}`;
+        break;
+      case 's': {
+        const v = !l.solo;
+        for (const x of s.lights) x.solo = false;
+        l.solo = v;
+        if (v) l.enabled = true;
+        msg = v ? `Solo: ${name} only` : 'Solo off: all lights';
+        break;
+      }
+      case 'ArrowLeft': case 'ArrowRight':
+        l.azimuth = wrap(l.azimuth + (k === 'ArrowLeft' ? -5 : 5));
+        msg = `${name}: ${side(l.azimuth)}`;
+        break;
+      case 'ArrowUp': case 'ArrowDown':
+        if (e.shiftKey) {
+          l.distance = THREE.MathUtils.clamp(l.distance * Math.pow(2, (k === 'ArrowUp' ? -1 : 1) / 6), 0.4, 6);
+          msg = `${name}: ${l.distance.toFixed(2)} m away`;
+        } else {
+          l.elevation = THREE.MathUtils.clamp(l.elevation + (k === 'ArrowUp' ? 5 : -5), -60, 85);
+          msg = `${name}: ${Math.round(Math.abs(l.elevation))}° ${l.elevation < 0 ? 'below' : 'above'} the eyes`;
+        }
+        break;
+      case '+': case '=': case '-': case '_':
+        l.power = step(POWER_STOPS, l.power, k === '+' || k === '=' ? 1 : -1);
+        msg = `${name}: ${formatPower(l.power)}`;
+        break;
+      case '[': case ']':
+        s.camera.aperture = step(APERTURES, s.camera.aperture, k === '[' ? -1 : 1);
+        msg = `Aperture ${formatAperture(s.camera.aperture)}`;
+        break;
+      case ',': case '.': {
+        const f = s.camera.focalLength;
+        const next = k === '.' ? FOCAL_LENGTHS.find((x) => x > f + 0.5) : [...FOCAL_LENGTHS].reverse().find((x) => x < f - 0.5);
+        if (next) s.camera.focalLength = next;
+        msg = `Lens ${Math.round(s.camera.focalLength)} mm`;
+        break;
+      }
+      case 'c': {
+        const i = FRAMINGS.findIndex((f) => f.label === this.framing);
+        const f = FRAMINGS[(i + 1) % FRAMINGS.length];
+        this.press('camera', f.label);
+        msg = f.label;
+        break;
+      }
+      case 'a':
+        s.camera.trackFocus = !s.camera.trackFocus;
+        msg = `Eye autofocus ${s.camera.trackFocus ? 'on' : 'off'}`;
+        break;
+      case 'e': {
+        const to = s.camera.exposureMode === 'auto' ? 'Manual' : 'Auto';
+        this.press('camera', to);
+        msg = `Exposure: ${to}`;
+        break;
+      }
+      case 'z':
+        s.camera.showFocusZone = !s.camera.showFocusZone;
+        msg = `In-focus zone ${s.camera.showFocusZone ? 'shown' : 'hidden'}`;
+        break;
+      case 'g':
+        s.view.showGear = !s.view.showGear;
+        msg = `Stands ${s.view.showGear ? 'shown' : 'hidden'}`;
+        break;
+      case 'd':
+        s.view.showDiagram = !s.view.showDiagram;
+        break;
+      default:
+        return;
+    }
+    e.preventDefault();
+    this.update();
+    if (msg) this.toastMsg(msg);
+  }
+
   // ------------------------------------------------------------ presets
 
   private applyPreset(p: Preset) {
@@ -539,9 +683,14 @@ export class App {
       help.classList.remove('pulse');
       this.tour.start();
     });
+    const keysBtn = P.el('button', 'ghost keys-btn');
+    keysBtn.title = 'Keyboard shortcuts (?)';
+    keysBtn.setAttribute('aria-label', 'Keyboard shortcuts');
+    keysBtn.innerHTML = svg('<rect x="2.5" y="6" width="19" height="12" rx="2"/><path d="M6 10h.01M9.5 10h.01M13 10h.01M16.5 10h.01M8 14h8"/>');
+    keysBtn.addEventListener('click', () => this.keys.toggle());
     const save = P.el('button', 'primary', 'Save photo');
     save.addEventListener('click', () => this.savePhoto());
-    actions.append(help, save);
+    actions.append(help, keysBtn, save);
     header.appendChild(actions);
     root.appendChild(header);
 
@@ -1011,12 +1160,12 @@ export class App {
       const bgd = P.slider(sec, {
         label: 'Subject to backdrop',
         min: 0.8,
-        max: 6,
+        max: MAX_BACKDROP_DISTANCE,
         step: 0.05,
-        get: () => s().subject.backgroundDistance,
+        get: () => Math.min(s().subject.backgroundDistance, MAX_BACKDROP_DISTANCE),
         set: (v) => (s().subject.backgroundDistance = v),
         format: (v) => `${v.toFixed(2)} m`,
-        ticks: [[1, '1 m'], [2, '2 m'], [4, '4 m'], [6, '6 m']],
+        ticks: [[1, '1 m'], [2, '2 m'], [3, '3 m'], [4, '4 m']],
         hint: 'Move the subject away from the backdrop to darken it and blur it more.',
       });
       P.showIf(bgd, () => s().env.mode === 'studio');
@@ -1028,11 +1177,12 @@ export class App {
 
     // Environment
     {
-      const sec = page('scene', 'Scene', 'A studio, open sky, or a real place.');
+      const sec = page('scene', 'Scene', 'A real studio, or a real place.');
+      // Open sky (simulated sun and sky) is hidden until it has realistic
+      // surroundings; its controls below stay wired up for when it returns.
       P.segmented(sec, {
         options: [
-          { value: 'studio', label: 'Studio', title: 'Seamless backdrop in a studio' },
-          { value: 'outdoor', label: 'Open sky', title: 'Simulated sun and sky: pick any time of day and weather' },
+          { value: 'studio', label: 'Studio', title: 'Seamless paper on stands in a real photo studio' },
           { value: 'location', label: 'Location', title: 'Real places captured as HDRI panoramas' },
         ],
         get: () => s().env.mode,
@@ -1056,7 +1206,7 @@ export class App {
         set: (v) => (s().env.ambient = v),
         format: (v) => `${Math.round(v)} lux`,
         ticks: [[0, 'dark'], [100, '100'], [200, '200'], [400, '400 lux']],
-        hint: 'Modelling lights and spill. Keep it low so your strobes do the work.',
+        hint: 'The studio room’s own light (windows, modelling lamps). Keep it low so your strobes do the work; turn it up to see the room.',
       });
 
       const out = P.el('div');
@@ -1162,7 +1312,7 @@ export class App {
       P.buttons(sec, [{ label: 'Reset everything', onClick: () => this.applyPreset(SCENARIO_PRESETS[0]) }]);
       const credits = P.el('div', 'hint credits');
       credits.innerHTML =
-        'Models &amp; HDRIs: Grab3D, Poly Haven, Kenney (CC0). ' +
+        'Models &amp; HDRIs: Grab3D, Poly Haven (CC0). ' +
         '<em>Infinite, 3D Head Scan</em> by Lee Perry-Smith, ' +
         '<a href="https://creativecommons.org/licenses/by/3.0/" target="_blank" rel="noopener">CC BY 3.0</a>, ' +
         'based on a work at www.triplegangers.com.';

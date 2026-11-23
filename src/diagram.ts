@@ -1,4 +1,5 @@
 // Top-down lighting diagram. Lights can be dragged around the subject.
+import { MAX_BACKDROP_DISTANCE, paperWidth } from './backdrop';
 import * as THREE from 'three';
 import { lightPosition, activeLights } from './lights';
 import { MODIFIERS, type LightId, type SimState } from './state';
@@ -118,7 +119,7 @@ export class Diagram {
       const p = lightPosition(l, eye);
       pts.push([p.x, p.z]);
     }
-    if (studio) pts.push([0, -state.subject.backgroundDistance]);
+    if (studio) pts.push([0, -Math.min(state.subject.backgroundDistance, MAX_BACKDROP_DISTANCE)]);
     let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
     for (const [x, z] of pts) {
       minX = Math.min(minX, x); maxX = Math.max(maxX, x);
@@ -151,9 +152,10 @@ export class Diagram {
 
     // Backdrop.
     if (studio) {
-      const [, by] = this.toScreen(0, -state.subject.backgroundDistance);
-      const [bx0] = this.toScreen(-4.5, 0);
-      const [bx1] = this.toScreen(4.5, 0);
+      const half = paperWidth(state) / 2;
+      const [, by] = this.toScreen(0, -Math.min(state.subject.backgroundDistance, MAX_BACKDROP_DISTANCE));
+      const [bx0] = this.toScreen(-half, 0);
+      const [bx1] = this.toScreen(half, 0);
       g.strokeStyle = state.env.backdrop;
       g.lineWidth = 5 * dpr;
       g.beginPath(); g.moveTo(bx0, by); g.lineTo(bx1, by); g.stroke();

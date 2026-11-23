@@ -72,6 +72,7 @@ Every visible UI element in v1, with its CSS class, contents, and states. Source
 | Title | `h1` | "Lighting Simulator" (16px, weight 650). |
 | Subtitle | `p` | "Light, lens and location — see how they interact." (12px, muted). |
 | Actions wrapper | `.header-actions` | Flex row, 8px gap. |
+| Shortcuts button | `button.ghost.keys-btn` | 34px square with a keyboard icon, after the Tutorial button. Opens the shortcuts panel; `?` does the same. Hidden on phones and touch screens. |
 | Tutorial button | `button.ghost.tutorial-btn` | Amber outline, a round "?" badge plus "Tutorial" (the word hides on phones). Pulses until the tour has been opened once (`photographysim.tourSeen` in localStorage). |
 | Save button | `button.primary` | "Save photo": amber fill, dark ink. Renders a high-quality frame and downloads a PNG. |
 
@@ -86,7 +87,16 @@ Every visible UI element in v1, with its CSS class, contents, and states. Source
 | Card | `.tour-card` | 340px dialog beside the control (left, right, above or below, whichever fits; centred when a step has no target). Step count, close ×, title, body, amber progress bar, Back and Next/Finish. |
 | Try line | `.tour-try` | Amber-bordered "Try: …" suggestion inside a card. |
 
-22 steps: welcome, view, top view, pages, then every group on Shoots, Lights and Camera, then Subject, Scene, View, Save photo and a closing card. Keys: ← → to move, Esc to close.
+### Shortcuts panel (`src/shortcuts.ts`)
+
+| Element | Class | Content |
+|---|---|---|
+| Overlay | `.keys-overlay` | Fixed, dims the app; click outside, ×, Esc or `?` closes it. |
+| Card | `.keys-card` | "Keyboard shortcuts", then four groups (General, Lights, Camera, View) in a two-column grid (`.keys-grid`): amber group titles, `<kbd>` keys, muted descriptions. Footer note that shortcuts pause while typing. |
+
+Shortcut feedback uses the existing viewport toast, e.g. "Rim light: 40° cam-right".
+
+23 steps: welcome, view, top view, pages, then every group on Shoots, Lights and Camera, then Subject, Scene, View, Save photo and a closing card. Keys: ← → to move, Esc to close.
 
 ---
 
@@ -182,7 +192,7 @@ The last page opened is saved in `localStorage` (`photographysim.page`) and reop
   - Foreground plant, Second person behind, String lights (bokeh). Outside the studio, the string lights also bring in street lamps.
 
 ### 5.5 Scene page (landscape icon)
-- **Mode**: segmented control with Studio, Open sky and Location. Each option has a tooltip.
+- **Mode**: segmented control with Studio and Location. Each option has a tooltip. (Open sky is hidden until it has realistic surroundings; its controls below still exist in code.)
 - Studio mode:
   - **Backdrop**: colour row with swatches White, Gray, Black, Blue, Warm, plus a picker.
   - **Room light**: slider from 0 to 400 lux, with a hint.

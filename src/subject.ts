@@ -341,46 +341,105 @@ async function loadBust(): Promise<{ group: THREE.Group; eye: THREE.Vector3 }> {
   return { group, eye: new THREE.Vector3(0, box.min.y + (box.max.y - box.min.y) * 0.8, box.max.z - 0.07) };
 }
 
-type SeatId = 'chair' | 'sofa' | 'log';
+type SeatId = 'box' | 'pair';
 
-/** Kenney's flat colours are toy-bright (a pink sofa, a salmon log): swap them for real-world ones. */
-function recolour(root: THREE.Object3D, colours: Record<string, number>) {
-  root.traverse((o) => {
-    const mesh = o as THREE.Mesh;
-    if (!mesh.isMesh) return;
-    mesh.material = ([] as THREE.Material[]).concat(mesh.material).map((m) => {
-      const c = colours[m.name] ?? colours['*'];
-      if (c === undefined) return m;
-      const copy = (m as THREE.MeshStandardMaterial).clone();
-      copy.color.setHex(c);
-      copy.roughness = 0.85;
-      return copy;
-    }) as THREE.Material | THREE.Material[];
-    if (Array.isArray(mesh.material) && mesh.material.length === 1) mesh.material = mesh.material[0];
-  });
-  return root;
+// Apple boxes: the plywood boxes every portrait studio sits people on. A
+// "full apple" is 20 × 12 × 8 in; stood on end it makes a 51 cm seat.
+const APPLE = { w: 0.305, h: 0.508, d: 0.203 };
+
+/** Birch plywood: pale with soft grain running along `along` the face, plies showing at the edges. */
+function plywood(w: number, h: number, handle: boolean): THREE.CanvasTexture {
+  const px = 220;
+  const c = document.createElement('canvas');
+  c.width = Math.round(w * px);
+  c.height = Math.round(h * px);
+  const g = c.getContext('2d')!;
+  g.fillStyle = '#c9a77a';
+  g.fillRect(0, 0, c.width, c.height);
+  // Grain: long wavy streaks.
+  for (let i = 0; i < 70; i++) {
+    const y0 = Math.random() * c.height;
+    const amp = 2 + Math.random() * 6;
+    const f = 0.01 + Math.random() * 0.03;
+    g.strokeStyle = `rgba(${Math.random() < 0.6 ? '120,82,45' : '235,210,170'},${0.08 + Math.random() * 0.12})`;
+    g.lineWidth = 0.6 + Math.random() * 1.8;
+    g.beginPath();
+    for (let x = 0; x <= c.width; x += 4) g.lineTo(x, y0 + Math.sin(x * f + i) * amp);
+    g.stroke();
+  }
+  // Handling marks and grime.
+  for (let i = 0; i < 25; i++) {
+    g.fillStyle = `rgba(70,50,30,${0.03 + Math.random() * 0.05})`;
+    g.beginPath();
+    g.ellipse(Math.random() * c.width, Math.random() * c.height, 4 + Math.random() * 14, 3 + Math.random() * 9, Math.random() * 3, 0, Math.PI * 2);
+    g.fill();
+  }
+  // The other panels' plies show along every edge.
+  const e = Math.max(3, Math.round(0.018 * px));
+  g.fillStyle = 'rgba(95,70,45,0.35)';
+  g.fillRect(0, 0, c.width, e * 0.35);
+  g.fillRect(0, c.height - e * 0.35, c.width, e * 0.35);
+  g.fillRect(0, 0, e * 0.35, c.height);
+  g.fillRect(c.width - e * 0.35, 0, e * 0.35, c.height);
+  if (handle) {
+    // Hand hole: a rounded slot, dark inside, with a lit lower lip.
+    const hw = c.width * 0.42;
+    const hh = Math.min(c.height * 0.16, 0.035 * px);
+    const x = (c.width - hw) / 2;
+    const y = c.height * 0.2;
+    g.fillStyle = '#1a120b';
+    g.beginPath();
+    g.roundRect(x, y, hw, hh, hh / 2);
+    g.fill();
+    g.strokeStyle = 'rgba(230,200,150,0.6)';
+    g.lineWidth = 2;
+    g.beginPath();
+    g.moveTo(x + hh / 2, y + hh);
+    g.lineTo(x + hw - hh / 2, y + hh);
+    g.stroke();
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 8;
+  return tex;
 }
 
-const SEATS: Record<SeatId, () => Promise<THREE.Group>> = {
-  // Kenney chair, ~0.92 m tall; pushed back so the seat sits under the hips.
-  chair: () =>
-    placedModel('models/kenney/chair.glb', 0.92).then((g) => {
-      g.position.z = -0.06;
-      return g;
-    }),
-  // Kenney lounge sofa, ~2 m wide.
-  sofa: () =>
-    placedModel('models/kenney/loungeSofa.glb', 0.95).then((g) => {
-      g.position.z = -0.22;
-      return recolour(g, { carpet: 0x4f5a66, wood: 0x6b4a32 }) as THREE.Group;
-    }),
-  // Kenney log, stretched along its length into a bench for two.
-  log: () =>
-    placedModel('models/kenney/log_large.glb', 0.44).then((g) => {
-      g.scale.x *= 1.7;
-      g.position.z = -0.12;
-      return recolour(g, { woodBark: 0x5b4130, woodInner: 0xc9a77f }) as THREE.Group;
-    }),
+/** One full apple box stood on end, its seat at y = 0.508. */
+function appleBox(): THREE.Mesh {
+  const { w, h, d } = APPLE;
+  const mat = (tw: number, th: number, handle: boolean) =>
+    new THREE.MeshStandardMaterial({ map: plywood(tw, th, handle), roughness: 0.78 });
+  // Box faces: +x, −x, +y, −y, +z, −z. The hand holes are in the 12 × 20 sides.
+  const side = mat(d, h, false);
+  const front = mat(w, h, true);
+  const top = mat(w, d, false);
+  const box = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), [side, side, top, top, front, front]);
+  box.position.y = h / 2;
+  box.castShadow = box.receiveShadow = true;
+  return box;
+}
+
+const SEATS: Record<SeatId, () => THREE.Group> = {
+  // One box under a single sitter, set back so the hips land on it.
+  box: () => {
+    const g = new THREE.Group();
+    const b = appleBox();
+    b.position.z = -0.06;
+    b.rotation.y = 0.08;
+    g.add(b);
+    return g;
+  },
+  // One box under each seated adult of the family.
+  pair: () => {
+    const g = new THREE.Group();
+    for (const m of GROUP_POSES.seated.members.filter((m) => m.pose === 'seated')) {
+      const b = appleBox();
+      b.position.set(m.x, b.position.y, m.z - 0.06);
+      b.rotation.y = D(m.yaw);
+      g.add(b);
+    }
+    return g;
+  },
 };
 
 // ------------------------------------------------------------------ subject
@@ -408,12 +467,12 @@ export class Subject {
     return this.state?.people === 'group';
   }
 
-  /** Bring the scene in line with the state; `indoor` picks a sofa rather than a log for seated groups. */
-  apply(s: SubjectState, indoor: boolean) {
+  /** Bring the scene in line with the state. */
+  apply(s: SubjectState) {
     this.state = s;
     const group = s.people === 'group';
     const model = group ? 'mannequin' : s.model;
-    const seatId: SeatId | null = group ? (GROUP_POSES[s.groupPose].seated ? (indoor ? 'sofa' : 'log') : null) : model === 'mannequin' && s.pose === 'seated' ? 'chair' : null;
+    const seatId: SeatId | null = group ? (GROUP_POSES[s.groupPose].seated ? 'pair' : null) : model === 'mannequin' && s.pose === 'seated' ? 'box' : null;
 
     // Fetch what this view needs.
     if (model === 'mannequin' && !group) {
@@ -444,13 +503,10 @@ export class Subject {
         }),
       );
     }
-    if (seatId) {
-      this.need(seatId, () =>
-        SEATS[seatId]().then((g) => {
-          this.seats[seatId] = g;
-          this.group.add(g);
-        }),
-      );
+    if (seatId && !this.seats[seatId]) {
+      const g = SEATS[seatId]();
+      this.seats[seatId] = g;
+      this.group.add(g);
     }
 
     // Visibility.

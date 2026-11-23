@@ -49,6 +49,10 @@ export class Tour {
     });
   }
 
+  get isOpen(): boolean {
+    return this.active;
+  }
+
   /** True until someone has opened the tutorial once. */
   static get unseen(): boolean {
     try {

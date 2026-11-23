@@ -82,7 +82,7 @@ export const POSE_OPTIONS: { value: PoseId; label: string; title: string }[] = [
   { value: 'thinker', label: 'Hand to chin', title: 'Hand near the face: watch its shadow and the light on the forearm' },
   { value: 'hip', label: 'Hand on hip', title: 'Classic fashion stance' },
   { value: 'crossed', label: 'Arms crossed', title: 'Closed, confident pose' },
-  { value: 'seated', label: 'Seated', title: 'On a chair' },
+  { value: 'seated', label: 'Seated', title: 'On an apple box' },
 ];
 export type SubjectModel = 'mannequin' | 'headscan' | 'bust';
 export type LocationId = 'studio_loft' | 'workshop' | 'meadow' | 'sunset' | 'park_overcast' | 'rooftop_night';
@@ -261,6 +261,11 @@ function setLights(s: SimState, lights: Partial<Record<LightId, Partial<LightSta
   s.selectedLight = 'key';
 }
 
+/** Outdoor scenarios have nothing to sit on. */
+function standUp(s: SimState) {
+  if (s.subject.pose === 'seated') s.subject.pose = 'turned';
+}
+
 const HEADSHOT: CameraView = { distance: 1.45, height: 1.64, azimuth: 0, targetHeight: 1.56 };
 const HALF: CameraView = { distance: 3.2, height: 1.55, azimuth: 0, targetHeight: 1.3 };
 const FULL: CameraView = { distance: 6.3, height: 1.3, azimuth: 0, targetHeight: 0.92 };
@@ -312,7 +317,7 @@ export const LIGHTING_PRESETS: Preset[] = [
     apply: (s) => {
       setLights(s, {
         key: { azimuth: 0, elevation: 45, distance: 1.3, modifier: 'beautydish', power: -3.67 },
-        bg: { azimuth: 180, elevation: -25, distance: 0.9, modifier: 'reflector', power: -5.33, shadows: false },
+        bg: { azimuth: 180, elevation: -25, distance: 1.1, modifier: 'reflector', power: -6, shadows: false },
       });
       s.subject.turn = 0;
       s.subject.pose = 'standing';
@@ -432,27 +437,36 @@ function outdoorShoot(s: SimState): CameraView {
   return HALF;
 }
 
-/** Window-lit workshop, softbox key on the window side. Reads `people`. */
+/**
+ * A real studio: gray seamless paper on stands in a dark room, softbox key,
+ * strip light rim and a light on the paper behind. Reads `people`: a group
+ * gets the wide roll, stands closer to it, and the lights move back.
+ */
 function indoorShoot(s: SimState): CameraView {
-  s.env = { ...s.env, mode: 'location', location: 'workshop', sunAzimuth: -70 };
+  s.env = { ...s.env, mode: 'studio', backdrop: BACKDROPS[1].color, ambient: 12 };
   s.subject = { ...s.subject, model: 'mannequin', turn: 0, foregroundProp: false, backgroundFigure: false, bokehLights: false };
   s.camera = { ...s.camera, exposureMode: 'auto', exposureComp: 0, whiteBalance: 5600, trackFocus: true };
   if (s.subject.people === 'group') {
+    s.subject.backgroundDistance = 1.7;
     setLights(s, {
-      key: { azimuth: -45, elevation: 25, distance: 2.8, modifier: 'softbox', size: 1.5, power: -2.33 },
+      key: { azimuth: -40, elevation: 25, distance: 2.8, modifier: 'softbox', size: 1.5, power: -2.33 },
       fill: { azimuth: 30, elevation: 8, distance: 3.4, modifier: 'umbrella', size: 1.5, power: -4.33 },
-      rim: { azimuth: 125, elevation: 45, distance: 2.6, modifier: 'stripbox', power: -4 },
+      // No background light: its stand would stand between the family.
+      rim: { azimuth: 125, elevation: 45, distance: 2.4, modifier: 'stripbox', power: -4 },
     });
-    s.camera.focalLength = 50;
-    s.camera.aperture = 4;
+    s.camera.focalLength = 70;
+    s.camera.aperture = 5.6;
     return groupView(s, 0.85);
   }
+  s.subject.backgroundDistance = 2.2;
   setLights(s, {
-    key: { azimuth: -55, elevation: 25, distance: 1.5, modifier: 'softbox', size: 1.0, power: -4 },
-    rim: { azimuth: 150, elevation: 35, distance: 1.6, modifier: 'stripbox', power: -5 },
+    key: { azimuth: -45, elevation: 30, distance: 1.5, modifier: 'softbox', size: 1.0, power: -4 },
+    rim: { azimuth: 145, elevation: 35, distance: 1.6, modifier: 'stripbox', power: -5 },
+    bg: { azimuth: 180, elevation: -25, distance: 1.1, modifier: 'reflector', power: -6, shadows: false },
   });
+  if (!SHOWCASE_POSES.includes(s.subject.pose)) s.subject.pose = 'turned';
   s.camera.focalLength = 85;
-  s.camera.aperture = 2.2;
+  s.camera.aperture = 4;
   return HALF;
 }
 
@@ -482,7 +496,7 @@ export const SHOOT_PRESETS: Preset[] = [
     id: 'indoor',
     label: 'Indoor',
     blurb:
-      'A window-lit workshop with a softbox key on the window side. Switch Solo ⇄ Group: the lights move back and turn up to cover everyone.',
+      'A real studio: gray seamless paper on stands, a softbox key, a strip light for the rim and a light on the paper. Switch Solo ⇄ Group: the wide roll goes up and the lights move back to cover everyone.',
     apply: indoorShoot,
   },
 ];
@@ -505,15 +519,12 @@ export const SCENARIO_PRESETS: Preset[] = [
   {
     id: 'window',
     label: 'Window light',
-    blurb: 'One big window to the side, continuous daylight, no strobes. Notice how fast light falls off across the room.',
+    blurb: 'A real workshop window to the side and no strobes at all. Notice how fast the light falls off across the face and the room.',
     apply: (s) => {
-      setLights(s, {
-        key: { kind: 'continuous', modifier: 'window', azimuth: -75, elevation: 12, distance: 1.3, power: 0, kelvin: 6200 },
-      });
-      studio(s, '#4a4744');
-      s.env.ambient = 40;
-      s.camera.aperture = 2;
-      s.camera.whiteBalance = 6000;
+      setLights(s, {});
+      s.env = { ...s.env, mode: 'location', location: 'workshop', sunAzimuth: -70 };
+      s.camera = { ...s.camera, exposureMode: 'auto', exposureComp: 0, aperture: 2, whiteBalance: 5800 };
+      s.subject.bokehLights = false;
       s.subject.turn = -20;
       s.subject.pose = 'seated';
       return { distance: 2.4, height: 1.25, azimuth: 0, targetHeight: 1.05 };
@@ -525,7 +536,8 @@ export const SCENARIO_PRESETS: Preset[] = [
     blurb: 'Low sun behind the subject gives a warm rim; expose for the face and let the background glow.',
     apply: (s) => {
       setLights(s, {});
-      s.env = { ...s.env, mode: 'outdoor', time: 17.7, sunAzimuth: 150, weather: 'clear', haze: false };
+      s.env = { ...s.env, mode: 'location', location: 'sunset', sunAzimuth: 150 };
+      standUp(s);
       s.camera.aperture = 2;
       s.camera.exposureMode = 'auto';
       s.camera.exposureComp = 0;
@@ -541,7 +553,8 @@ export const SCENARIO_PRESETS: Preset[] = [
     blurb: 'The whole sky becomes one giant softbox. Soft, flat, even light with gentle shadows under the brow and chin.',
     apply: (s) => {
       setLights(s, {});
-      s.env = { ...s.env, mode: 'outdoor', time: 13, sunAzimuth: -40, weather: 'overcast', haze: false };
+      s.env = { ...s.env, mode: 'location', location: 'park_overcast', sunAzimuth: -40 };
+      standUp(s);
       s.camera.aperture = 2.8;
       s.camera.exposureMode = 'auto';
       s.camera.exposureComp = 0;
@@ -558,7 +571,8 @@ export const SCENARIO_PRESETS: Preset[] = [
       setLights(s, {
         fill: { azimuth: 15, elevation: 10, distance: 1.8, modifier: 'umbrella', power: -1 },
       });
-      s.env = { ...s.env, mode: 'outdoor', time: 12.5, sunAzimuth: -30, weather: 'clear', haze: false };
+      s.env = { ...s.env, mode: 'location', location: 'meadow', sunAzimuth: -30 };
+      standUp(s);
       s.camera.aperture = 5.6;
       s.camera.exposureMode = 'auto';
       s.camera.exposureComp = 0;
@@ -568,30 +582,17 @@ export const SCENARIO_PRESETS: Preset[] = [
     },
   },
   {
-    id: 'shade',
-    label: 'Open shade',
-    blurb: 'Subject out of direct sun, lit only by the sky. Soft but cool: warm up the white balance to compensate.',
-    apply: (s) => {
-      setLights(s, {});
-      s.env = { ...s.env, mode: 'outdoor', time: 15, sunAzimuth: 120, weather: 'shade', haze: false };
-      s.camera.aperture = 2.8;
-      s.camera.exposureMode = 'auto';
-      s.camera.whiteBalance = 7000;
-      s.subject.bokehLights = false;
-      return HALF;
-    },
-  },
-  {
-    id: 'bluehour',
-    label: 'Blue hour + strobe',
-    blurb: 'Manual exposure. The strobe lights the subject (aperture controls it); the shutter controls how bright the ambient sky and lights are.',
+    id: 'sunset-strobe',
+    label: 'Sunset + strobe',
+    blurb: 'Manual exposure. The strobe lights the subject (aperture controls it); the shutter controls how bright the sunset behind is. Try 1/250 to deepen the sky, then 1/30.',
     apply: (s) => {
       setLights(s, {
-        key: { azimuth: -40, elevation: 25, distance: 1.4, modifier: 'octabox', power: -4.67, kelvin: 5600 },
+        key: { azimuth: -40, elevation: 25, distance: 1.4, modifier: 'octabox', power: -4, kelvin: 5600 },
       });
-      s.env = { ...s.env, mode: 'outdoor', time: 18.35, sunAzimuth: 160, weather: 'clear', haze: false };
-      s.camera = { ...s.camera, exposureMode: 'manual', aperture: 2.8, iso: 400, shutter: 1 / 15, whiteBalance: 5600 };
-      s.subject.bokehLights = true;
+      s.env = { ...s.env, mode: 'location', location: 'sunset', sunAzimuth: 160 };
+      standUp(s);
+      s.camera = { ...s.camera, exposureMode: 'manual', aperture: 4, iso: 100, shutter: 1 / 125, whiteBalance: 5600 };
+      s.subject.bokehLights = false;
       return HALF;
     },
   },
