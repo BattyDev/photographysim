@@ -341,7 +341,7 @@ async function loadBust(): Promise<{ group: THREE.Group; eye: THREE.Vector3 }> {
   return { group, eye: new THREE.Vector3(0, box.min.y + (box.max.y - box.min.y) * 0.8, box.max.z - 0.07) };
 }
 
-type SeatId = 'box' | 'pair';
+type SeatId = 'box' | 'pair' | 'bench';
 
 // Apple boxes: the plywood boxes every portrait studio sits people on. A
 // "full apple" is 20 × 12 × 8 in; stood on end it makes a 51 cm seat.
@@ -419,7 +419,7 @@ function appleBox(): THREE.Mesh {
   return box;
 }
 
-const SEATS: Record<SeatId, () => THREE.Group> = {
+const SEATS: Record<SeatId, (loaded: () => void) => THREE.Group> = {
   // One box under a single sitter, set back so the hips land on it.
   box: () => {
     const g = new THREE.Group();
@@ -438,6 +438,16 @@ const SEATS: Record<SeatId, () => THREE.Group> = {
       b.rotation.y = D(m.yaw);
       g.add(b);
     }
+    return g;
+  },
+  // Outdoors the family sits on a real park bench (Poly Haven, CC0).
+  bench: (loaded) => {
+    const g = new THREE.Group();
+    placedModel('models/polyhaven/painted_wooden_bench/painted_wooden_bench_1k.gltf').then((m) => {
+      m.position.z = -0.12;
+      g.add(m);
+      loaded();
+    });
     return g;
   },
 };
@@ -467,12 +477,12 @@ export class Subject {
     return this.state?.people === 'group';
   }
 
-  /** Bring the scene in line with the state. */
-  apply(s: SubjectState) {
+  /** Bring the scene in line with the state. `outdoors` seats a group on a bench rather than apple boxes. */
+  apply(s: SubjectState, outdoors = false) {
     this.state = s;
     const group = s.people === 'group';
     const model = group ? 'mannequin' : s.model;
-    const seatId: SeatId | null = group ? (GROUP_POSES[s.groupPose].seated ? 'pair' : null) : model === 'mannequin' && s.pose === 'seated' ? 'box' : null;
+    const seatId: SeatId | null = group ? (GROUP_POSES[s.groupPose].seated ? (outdoors ? 'bench' : 'pair') : null) : model === 'mannequin' && s.pose === 'seated' ? 'box' : null;
 
     // Fetch what this view needs.
     if (model === 'mannequin' && !group) {
@@ -504,7 +514,7 @@ export class Subject {
       );
     }
     if (seatId && !this.seats[seatId]) {
-      const g = SEATS[seatId]();
+      const g = SEATS[seatId](() => this.onLoaded());
       this.seats[seatId] = g;
       this.group.add(g);
     }

@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { placedModel } from './assets';
 import { Backdrop, MAX_BACKDROP_DISTANCE, paperWidth } from './backdrop';
-import { HdriLibrary, type HdriData } from './hdri';
+import { HdriLibrary, locationSpec, type HdriData } from './hdri';
 import { kelvinToRGB, srgbToLinear } from './photo';
 import type { LocationId, SimState, Weather } from './state';
 import { loadFigure, type Figure } from './subject';
@@ -143,6 +143,9 @@ function noiseTexture(base: string, spread: number, size = 256, blades = false):
  */
 const STUDIO_ROOM = { rot: -15, back: -3.03, cx: -0.05, behindPaper: 0.75 };
 
+/** Layer seen only by the sun's shadow camera. */
+const SHADE_LAYER = 5;
+
 export interface LocationInfo {
   sunElevation: number | null;
   sunKelvin: number;
@@ -161,6 +164,15 @@ export class World {
   /** Holds the projected panorama surfaces of whichever place is showing (studio room or location). */
   private placeRoot = new THREE.Group();
   private plant = new THREE.Group();
+  /** Outdoor depth props: a tree stump in front, a boulder behind. */
+  private stump = new THREE.Group();
+  private boulder = new THREE.Group();
+  /**
+   * Stands in for a building between the sun and the subject ("Subject in
+   * shade"). It lives on its own layer, which only the sun's shadow camera
+   * sees: it casts the shadow but never shows up or takes part in focusing.
+   */
+  private shadeCaster: THREE.Mesh;
   private figure: Figure | null = null;
   private lamps = new THREE.Group();
   private lampBulbs: THREE.MeshStandardMaterial[] = [];
@@ -250,6 +262,16 @@ export class World {
     // Props (loaded the first time they are switched on).
     this.plant.position.set(-0.62, 0, 1.25);
     this.props.add(this.plant);
+    this.stump.position.set(-0.75, 0, 1.45);
+    this.boulder.position.set(1.7, 0, -5.5);
+    this.props.add(this.stump, this.boulder);
+
+    this.shadeCaster = new THREE.Mesh(new THREE.BoxGeometry(16, 40, 1), new THREE.MeshBasicMaterial());
+    this.shadeCaster.castShadow = true;
+    this.shadeCaster.layers.set(SHADE_LAYER);
+    this.shadeCaster.visible = false;
+    this.sun.shadow.camera.layers.enable(SHADE_LAYER);
+    scene.add(this.shadeCaster);
     this.lamps.visible = false;
     this.props.add(this.lamps);
 
@@ -301,6 +323,14 @@ export class World {
     if (this.requested.has(key)) return;
     this.requested.add(key);
     load().then(() => this.onAssetLoaded());
+  }
+
+  /** A Poly Haven prop at its real size (or scaled to `height`), turned by `rot`. */
+  private loadProp(file: string, into: THREE.Group, rot: number, height?: number) {
+    return placedModel(`models/polyhaven/${file}`, height).then((m) => {
+      m.rotation.y = rot;
+      into.add(m);
+    });
   }
 
   private loadPlant() {
@@ -382,7 +412,7 @@ export class World {
       if (!h) return 1000;
       const rot = this.locationRotation(s, h);
       let e = HdriLibrary.irradiance(h, n, rot);
-      if (h.sunDir) e += h.sunE * Math.max(0, n.dot(h.sunDir.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), rot)));
+      if (h.sunDir && !s.env.inShade) e += h.sunE * Math.max(0, n.dot(h.sunDir.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), rot)));
       return e;
     }
     const room = this.hdri.get('studio_loft');
@@ -416,7 +446,11 @@ export class World {
     }
     if (want) this.need(`loc:${want}`, () => this.hdri.load(want));
     if (!want) this.showPlace(null);
-    if (s.subject.foregroundProp) this.need('plant', () => this.loadPlant());
+    const outdoors = mode === 'location' && locationSpec(s.env.location).proxy.kind === 'open';
+    if (s.subject.foregroundProp && !outdoors) this.need('plant', () => this.loadPlant());
+    if (s.subject.foregroundProp && outdoors) this.need('stump', () => this.loadProp('tree_stump_01/tree_stump_01_1k.gltf', this.stump, 0.9));
+    if (s.subject.backgroundProp && outdoors) this.need('boulder', () => this.loadProp('boulder_01/boulder_01_1k.gltf', this.boulder, -0.5, 1.1));
+    this.shadeCaster.visible = false;
     if (s.subject.backgroundFigure) this.need('figure', () => this.loadBackgroundFigure());
     if (s.subject.bokehLights && mode !== 'studio') this.need('lamps', () => this.loadLamps());
 
@@ -476,6 +510,16 @@ export class World {
           this.sun.target.position.set(0, 1, -1);
           this.sun.shadow.radius = Math.max(1, (0.012 * 0.5) / (14 / 2048));
           this.locSunDir = dir;
+          // Open shade: a "building" 6 m toward the sun, tall and wide enough to
+          // shade the subject and the ground around them at any sun height.
+          if (s.env.inShade) {
+            const flat = new THREE.Vector3(dir.x, 0, dir.z);
+            if (flat.lengthSq() < 1e-6) flat.set(0, 0, -1);
+            flat.normalize();
+            this.shadeCaster.position.copy(flat).multiplyScalar(6).setY(20);
+            this.shadeCaster.lookAt(0, 20, 0);
+            this.shadeCaster.visible = true;
+          }
         }
         const el = h.sunDir ? THREE.MathUtils.radToDeg(Math.asin(h.sunDir.y)) : null;
         this.locInfo = { sunElevation: el, sunKelvin: h.spec.kelvin, lux: h.spec.lux };
@@ -541,7 +585,9 @@ export class World {
 
     // Props.
     const open = mode !== 'studio';
-    this.plant.visible = s.subject.foregroundProp;
+    this.plant.visible = s.subject.foregroundProp && !outdoors;
+    this.stump.visible = s.subject.foregroundProp && outdoors;
+    this.boulder.visible = s.subject.backgroundProp && outdoors;
     if (this.figure) {
       this.figure.root.visible = s.subject.backgroundFigure;
       if (open) this.figure.root.position.set(1.2, 0, -4.5);

@@ -226,7 +226,7 @@ export class App {
   /** Push the whole state into the scene and refresh the UI. */
   update() {
     const s = this.state;
-    this.subject.apply(s.subject);
+    this.subject.apply(s.subject, s.env.mode === 'location' && locationSpec(s.env.location).proxy.kind === 'open');
     this.subject.eyePosition(this.eye);
 
     this.camera.setFocalLength(s.camera.focalLength);
@@ -1170,7 +1170,15 @@ export class App {
       });
       P.showIf(bgd, () => s().env.mode === 'studio');
       const props = P.group(sec, 'Depth props');
-      P.toggle(props, { label: 'Foreground plant', get: () => s().subject.foregroundProp, set: (v) => (s().subject.foregroundProp = v) });
+      const outdoors = () => s().env.mode === 'location' && locationSpec(s().env.location).proxy.kind === 'open';
+      P.toggle(props, {
+        label: 'Something in front',
+        get: () => s().subject.foregroundProp,
+        set: (v) => (s().subject.foregroundProp = v),
+        hint: 'A potted plant indoors, a tree stump outdoors, close to the camera.',
+      });
+      const boulder = P.toggle(props, { label: 'Boulder behind', get: () => s().subject.backgroundProp, set: (v) => (s().subject.backgroundProp = v) });
+      P.showIf(boulder, outdoors);
       P.toggle(props, { label: 'Second person behind', get: () => s().subject.backgroundFigure, set: (v) => (s().subject.backgroundFigure = v) });
       P.toggle(props, { label: 'String lights (bokeh)', get: () => s().subject.bokehLights, set: (v) => (s().subject.bokehLights = v) });
     }
@@ -1278,6 +1286,13 @@ export class App {
         ticks: [[-180, 'backlit'], [-90, 'left'], [0, 'front'], [90, 'right'], [180, 'backlit']],
         hint: 'Spins the whole place around the subject. Where there is no sun, it turns the brightest side.',
       });
+      const shade = P.toggle(loc, {
+        label: 'Subject in shade',
+        get: () => s().env.inShade,
+        set: (v) => (s().env.inShade = v),
+        hint: 'A building blocks the sun from the subject and the ground around them: open shade. The background stays sunny.',
+      });
+      P.showIf(shade, () => locationSpec(s().env.location).sun);
       const locInfo = P.group(loc, '', 'readouts');
       P.readout(locInfo, 'Sun', () => {
         const li = this.world.locationInfo;

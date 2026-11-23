@@ -35,6 +35,14 @@ export const LOCATIONS: LocationSpec[] = [
   { id: 'meadow', label: 'Meadow, midday', file: 'meadow_2_2k.hdr', lux: 60000, sun: true, height: 1.6, proxy: { kind: 'open', radius: 80 }, kelvin: 5600, blurb: 'Hard high sun and a blue sky: the toughest light for portraits.' },
   { id: 'sunset', label: 'Venice, sunset', file: 'venice_sunset_2k.hdr', lux: 1500, sun: true, height: 1.6, proxy: { kind: 'open', radius: 60 }, kelvin: 3200, blurb: 'Low warm sun skimming the water: golden-hour colour and long shadows.' },
   { id: 'park_overcast', label: 'Tiergarten park', file: 'tiergarten_2k.hdr', lux: 12000, sun: false, height: 1.6, proxy: { kind: 'open', radius: 60 }, kelvin: 6500, blurb: 'Park under soft sky: gentle, even, flattering light.' },
+  // Added from Poly Haven (CC0). Lux is the horizontal illuminance a meter would read there;
+  // the open-proxy radius is roughly how far away the surroundings are.
+  { id: 'field_sunrise', label: 'Field, sunrise', file: 'bloem_field_sunrise_2k.hdr', lux: 900, sun: true, height: 1.6, proxy: { kind: 'open', radius: 90 }, kelvin: 3300, blurb: 'The sun right on the horizon across an open field: the classic golden-hour backlight.' },
+  { id: 'courtyard', label: 'City courtyard', file: 'urban_courtyard_2k.hdr', lux: 55000, sun: true, height: 1.6, proxy: { kind: 'open', radius: 26 }, kelvin: 5600, blurb: 'Bright sun between buildings. Turn on "Subject in shade" for open shade: soft light on the face, a sunny background.' },
+  { id: 'quadrangle', label: 'Quadrangle, midday', file: 'quadrangle_sunny_2k.hdr', lux: 50000, sun: true, height: 1.6, proxy: { kind: 'open', radius: 30 }, kelvin: 5500, blurb: 'High sun through thin cloud over a lawn and hedges: hard shadows from above. Needs fill.' },
+  { id: 'beach_overcast', label: 'Beach, under a bridge', file: 'beach_cloudy_bridge_2k.hdr', lux: 2500, sun: false, height: 1.6, proxy: { kind: 'open', radius: 20 }, kelvin: 6300, blurb: 'Overcast sky, with a bridge overhead blocking the top light: soft, directional light from the open sides.' },
+  { id: 'forest', label: 'Forest', file: 'forest_slope_2k.hdr', lux: 9000, sun: false, height: 1.6, proxy: { kind: 'open', radius: 14 }, kelvin: 6000, blurb: 'Under tall pines: soft green-tinted light, with trees at every distance for depth of field.' },
+  { id: 'street_night', label: 'Cobblestone street, night', file: 'cobblestone_street_night_2k.hdr', lux: 15, sun: false, height: 1.6, proxy: { kind: 'open', radius: 9 }, kelvin: 2400, blurb: 'Sodium street lamps and lit windows: warm, dim and full of bokeh. Bring a strobe.' },
   { id: 'rooftop_night', label: 'City rooftop, night', file: 'rooftop_night_2k.hdr', lux: 12, sun: false, height: 1.7, proxy: { kind: 'open', radius: 40 }, kelvin: 3400, blurb: 'Dim city glow: bring your own light, and let the lights become bokeh.' },
 ];
 

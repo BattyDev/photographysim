@@ -115,12 +115,12 @@ The last page opened is saved in `localStorage` (`photographysim.page`) and reop
   - Outdoor solo, Outdoor family, Indoor. The app opens on Outdoor solo.
   - **People**: segmented control, Solo | Group (a family of four). Switching re-runs the current shoot for the new group size: outdoor swaps between Outdoor solo and Outdoor family; Indoor stays Indoor and moves its lights back for the group.
   - **Pose** (solo only): `.button-grid.cols-3.small` of `.chip` buttons, with tooltips that say what each pose shows off. Picking one switches the subject to the mannequin.
-    - Standing, Three-quarter, Profile, Over shoulder, Chin up, Hand to chin, Hand on hip, Arms crossed, Seated (adds a chair).
-  - **Group pose** (group only): segmented control, Standing | Casual | Seated. Seated adds a sofa indoors or a log outdoors. Picking one reframes the camera.
+    - Standing, Three-quarter, Profile, Over shoulder, Chin up, Hand to chin, Hand on hip, Arms crossed, Seated (on an apple box).
+  - **Group pose** (group only): segmented control, Standing | Casual | Seated. Seated puts them on apple boxes indoors or a park bench outdoors. Picking one reframes the camera.
 - **Group "Lighting setups"**: `.button-grid`, 2 columns of `.chip` buttons. The tooltip on each button is a one-line description.
   - Rembrandt, Loop, Butterfly, Clamshell, Split, Rim / edge, High-key, Low-key.
 - **Group "Scenarios"**: `.button-grid`, 2 columns of `.chip` buttons.
-  - Studio portrait, Window light, Golden hour, Overcast, Midday + fill flash, Open shade, Blue hour + strobe, Night bokeh.
+  - Studio portrait, Window light, Golden hour, Overcast, Midday + fill flash, Open shade, Sunset + strobe, Night street + strobe, Night bokeh.
 - **Preset note**: `.preset-note`, a panel with an amber left border.
   - Contains rich text (`<strong>` allowed) explaining the last preset picked.
   - Default text: "Pick a shoot or a setup to load it, then tweak anything in the other pages."
@@ -188,8 +188,10 @@ The last page opened is saved in `localStorage` (`photographysim.page`) and reop
 - **Subject**: segmented control with Mannequin, Head scan, Marble bust. Each option has a tooltip. Solo only (the group is always mannequins). Poses are in Quick starts.
 - **Turn**: slider from −90° to 90°, e.g. "facing camera" or "30° to cam-left". Hint about short vs broad lighting.
 - **Subject to backdrop**: slider from 0.8 to 6 m, with a hint. Studio only.
-- **Group "Depth props"**: three toggles.
-  - Foreground plant, Second person behind, String lights (bokeh). Outside the studio, the string lights also bring in street lamps.
+- **Group "Depth props"**: toggles.
+  - **Something in front**: a potted plant indoors, a tree stump outdoors. Hint says so.
+  - **Boulder behind**: outdoor locations only.
+  - Second person behind, String lights (bokeh). Outside the studio, the string lights also bring in street lamps.
 
 ### 5.5 Scene page (landscape icon)
 - **Mode**: segmented control with Studio and Location. Each option has a tooltip. (Open sky is hidden until it has realistic surroundings; its controls below still exist in code.)
@@ -207,11 +209,12 @@ The last page opened is saved in `localStorage` (`photographysim.page`) and reop
     - **Sun**: e.g. "42° high · 5400 K", or "−4° below horizon".
     - **Light level**: e.g. "85k lux" or "12 lux".
 - Location mode:
-  - **Location**: select with 6 options.
-    - Photo studio loft, Artist workshop, Meadow (midday), Venice (sunset), Tiergarten park, City rooftop (night).
+  - **Location**: select with 12 options.
+    - Photo studio loft, Artist workshop, Meadow (midday), Venice (sunset), Tiergarten park, Field (sunrise), City courtyard, Quadrangle (midday), Beach (under a bridge), Forest, Cobblestone street (night), City rooftop (night).
     - In the 3D view, the panorama is drawn on real surfaces: a ground disc and far dome outdoors, and the room's floor, walls and ceiling indoors. Flash lights them and they catch shadows. A sharp 8k (or 4k on phones) layer fades in once downloaded.
   - **Hint**: one-line description of the chosen location.
   - **Sun direction**: slider from −180° to 180°. Spins the whole panorama around the subject. Hint explains it.
+  - **Subject in shade**: toggle, shown only for locations with a sun. Hint: a building blocks the sun from the subject; the background stays sunny.
   - **Readout box**:
     - **Sun**: "27° high", "no direct sun", or "loading…" while the panorama downloads.
     - **Light level**: the location's calibrated lux.

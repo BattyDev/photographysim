@@ -23,11 +23,11 @@ Built with Three.js + Vite + TypeScript. See [PLAN.md](PLAN.md) for the design b
   above 1/250 sync); ambient and continuous light don't — so you can "drag the
   shutter". Incident meter at the face, per-light f-stop readouts, key:fill
   ratio, background vs face in EV. Camera white balance.
-- **Shoots**: three ready-to-go shoots: Outdoor solo, Outdoor family (meadow,
-  sun as a backlight, octabox key) and Indoor (window-lit workshop, softbox key).
-  **People** swaps between one person and a family of four. Indoor moves its
-  lights back and powers them up to cover the group. Group poses: standing,
-  casual, or seated on a sofa or log.
+- **Shoots**: three ready-to-go shoots: Outdoor solo, Outdoor family (a field
+  at sunrise, the low sun as a backlight, octabox key) and Indoor (studio paper,
+  softbox key). **People** swaps between one person and a family of four, and
+  the lights move back and power up to cover the group. Group poses: standing,
+  casual, or seated (on apple boxes indoors, a park bench outdoors).
 - **Subject & scene**: three ready-made subjects:
   - a rigged wooden mannequin with 9 poses, set by rotating its bones. Several
     are there to show light off: three-quarter (short vs broad), profile (split),
@@ -36,8 +36,9 @@ Built with Three.js + Vite + TypeScript. See [PLAN.md](PLAN.md) for the design b
   - a marble bust
 
   Turn control for all of them. Seated poses sit on apple boxes, the plywood
-  boxes portrait studios use. Depth props: a foreground plant, a second
-  mannequin, string lights and street lamps for bokeh. Subject-to-backdrop
+  boxes portrait studios use. Depth props: something in front (a potted plant
+  indoors, a tree stump outdoors), a boulder a few metres behind (outdoors), a
+  second mannequin, string lights and street lamps for bokeh. Subject-to-backdrop
   distance.
 - **Environments**:
   - **Studio**: a seamless paper backdrop as it stands in a real studio: a
@@ -49,10 +50,17 @@ Built with Three.js + Vite + TypeScript. See [PLAN.md](PLAN.md) for the design b
   - **Open sky** (simulated sun and sky) is hidden for now: without realistic
     surroundings it was a flat plane. Its code stays wired up for when real
     outdoor settings arrive.
-  - **Location**: six real HDRI panoramas (studio loft, artist workshop,
-    meadow, Venice sunset, park, city rooftop at night), calibrated to real lux.
+  - **Location**: twelve real HDRI panoramas, calibrated to real lux:
+    - indoors: studio loft, artist workshop
+    - sun: meadow (midday), field at sunrise, city courtyard, quadrangle
+      (midday), Venice sunset
+    - soft light: Tiergarten park, beach under a bridge (overcast), forest
+    - night: cobblestone street, city rooftop
+
     Each sun is extracted into a shadow-casting light you can rotate around the
-    subject. The panorama is projected from where it was shot onto real
+    subject. **Subject in shade** (locations with a sun) blocks the sun from
+    the subject and the ground around them, as a building would, while the
+    background stays sunny: open shade. The panorama is projected from where it was shot onto real
     surfaces at real distances: a ground disc and far dome outdoors, and the
     measured room (floor, walls, ceiling) indoors. Those surfaces are
     relightable: flash brightens the floor and nearby walls by exactly what it
@@ -60,8 +68,9 @@ Built with Three.js + Vite + TypeScript. See [PLAN.md](PLAN.md) for the design b
     their true distance. A sharp 8k photo (4k on phones) adds fine detail on
     top of the 2k HDR, loaded only for the location on screen.
 - **Quick starts**: 8 lighting setups (Rembrandt, loop, butterfly, clamshell,
-  split, rim, high-key, low-key) and 8 scenarios (studio, window light, golden
-  hour, overcast, midday + fill flash, open shade, blue hour + strobe, night bokeh).
+  split, rim, high-key, low-key) and 9 scenarios (studio, window light, golden
+  hour, overcast, midday + fill flash, open shade, sunset + strobe, night street
+  + strobe, night bokeh).
 - Top-view setup diagram (drag lights), click lights in 3D to move them with a
   gizmo, and **Save photo** to download a PNG.
 - **Keyboard shortcuts**: press `?` or the keyboard button in the header for
@@ -88,7 +97,7 @@ head scan:
 
 Nothing heavy is in the JS bundle. Each model, HDRI and prop is fetched the
 first time a view needs it, so the default Outdoor solo shoot loads only the
-mannequin and the meadow HDRI. The family, seats, other locations, props and
+mannequin and the field-at-sunrise HDRI. The family, seats, other locations, props and
 alternate subjects load when picked.
 
 Assets are served from `public/assets/` by default. To host them elsewhere

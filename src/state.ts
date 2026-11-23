@@ -85,7 +85,19 @@ export const POSE_OPTIONS: { value: PoseId; label: string; title: string }[] = [
   { value: 'seated', label: 'Seated', title: 'On an apple box' },
 ];
 export type SubjectModel = 'mannequin' | 'headscan' | 'bust';
-export type LocationId = 'studio_loft' | 'workshop' | 'meadow' | 'sunset' | 'park_overcast' | 'rooftop_night';
+export type LocationId =
+  | 'studio_loft'
+  | 'workshop'
+  | 'meadow'
+  | 'sunset'
+  | 'park_overcast'
+  | 'rooftop_night'
+  | 'field_sunrise'
+  | 'courtyard'
+  | 'quadrangle'
+  | 'beach_overcast'
+  | 'forest'
+  | 'street_night';
 export type EnvMode = 'studio' | 'outdoor' | 'location';
 export type Weather = 'clear' | 'hazy' | 'overcast' | 'shade';
 
@@ -111,8 +123,11 @@ export interface SubjectState {
   people: People;
   groupPose: GroupPoseId;
   backgroundDistance: number; // subject to backdrop (studio)
+  /** A plant in the studio, a tree stump outdoors, close to the camera. */
   foregroundProp: boolean;
   backgroundFigure: boolean;
+  /** A boulder a few metres behind the subject (outdoor locations). */
+  backgroundProp: boolean;
   bokehLights: boolean;
 }
 
@@ -124,6 +139,8 @@ export interface EnvState {
   ambient: number; // studio room light, lux
   time: number; // hours, outdoor
   sunAzimuth: number; // deg, same convention as lights
+  /** Location sun blocked from the subject, as by a building: open shade. */
+  inShade: boolean;
   weather: Weather;
   haze: boolean;
 }
@@ -220,6 +237,7 @@ export function defaultState(): SimState {
       backgroundDistance: 2.5,
       foregroundProp: true,
       backgroundFigure: false,
+      backgroundProp: false,
       bokehLights: false,
     },
     env: {
@@ -229,6 +247,7 @@ export function defaultState(): SimState {
       ambient: 15,
       time: 12.5,
       sunAzimuth: -50,
+      inShade: false,
       weather: 'clear',
       haze: false,
     },
@@ -414,22 +433,26 @@ export function groupView(s: SimState, k = 1): CameraView {
 
 const SHOWCASE_POSES: PoseId[] = ['turned', 'profile', 'overshoulder', 'chinup', 'thinker'];
 
-/** Meadow, sun behind the subject as a hair light, off-camera octabox key. Reads `people`. */
+/**
+ * A field at sunrise: the sun on the horizon behind the subject as a hair
+ * light, an off-camera octabox key about half a stop over the soft daylight on
+ * the face. Reads `people`.
+ */
 function outdoorShoot(s: SimState): CameraView {
-  s.env = { ...s.env, mode: 'location', location: 'meadow', sunAzimuth: 145 };
+  s.env = { ...s.env, inShade: false, mode: 'location', location: 'field_sunrise', sunAzimuth: 150 };
   s.subject = { ...s.subject, model: 'mannequin', turn: 0, foregroundProp: false, backgroundFigure: false, bokehLights: false };
   s.camera = { ...s.camera, exposureMode: 'auto', exposureComp: 0, whiteBalance: 5600, trackFocus: true };
   if (s.subject.people === 'group') {
     setLights(s, {
-      key: { azimuth: -32, elevation: 22, distance: 3.2, modifier: 'octabox', size: 1.8, power: -1.67 },
-      fill: { azimuth: 25, elevation: 5, distance: 4, modifier: 'umbrella', size: 1.5, power: -3.67 },
+      key: { azimuth: -32, elevation: 22, distance: 3.2, modifier: 'octabox', size: 1.8, power: -2.67 },
+      fill: { azimuth: 25, elevation: 5, distance: 4, modifier: 'umbrella', size: 1.5, power: -4.67 },
     });
     s.camera.focalLength = 70;
     s.camera.aperture = 5.6;
     return groupView(s);
   }
   setLights(s, {
-    key: { azimuth: -40, elevation: 28, distance: 1.7, modifier: 'octabox', size: 1.2, power: -3.33 },
+    key: { azimuth: -40, elevation: 28, distance: 1.7, modifier: 'octabox', size: 1.2, power: -4.33 },
   });
   if (!SHOWCASE_POSES.includes(s.subject.pose)) s.subject.pose = 'turned';
   s.camera.focalLength = 85;
@@ -443,7 +466,7 @@ function outdoorShoot(s: SimState): CameraView {
  * gets the wide roll, stands closer to it, and the lights move back.
  */
 function indoorShoot(s: SimState): CameraView {
-  s.env = { ...s.env, mode: 'studio', backdrop: BACKDROPS[1].color, ambient: 12 };
+  s.env = { ...s.env, inShade: false, mode: 'studio', backdrop: BACKDROPS[1].color, ambient: 12 };
   s.subject = { ...s.subject, model: 'mannequin', turn: 0, foregroundProp: false, backgroundFigure: false, bokehLights: false };
   s.camera = { ...s.camera, exposureMode: 'auto', exposureComp: 0, whiteBalance: 5600, trackFocus: true };
   if (s.subject.people === 'group') {
@@ -476,7 +499,7 @@ export const SHOOT_PRESETS: Preset[] = [
     id: 'outdoor-solo',
     label: 'Outdoor solo',
     blurb:
-      'Sun behind the subject as a hair light, an off-camera octabox as the key. Try Three-quarter, Profile and Over shoulder to see the rim light change.',
+      'Sunrise over an open field, the low sun behind the subject as a hair light, an off-camera octabox as the key. Try Three-quarter, Profile and Over shoulder to see the rim light change.',
     apply: (s) => {
       s.subject.people = 'solo';
       return outdoorShoot(s);
@@ -486,7 +509,7 @@ export const SHOOT_PRESETS: Preset[] = [
     id: 'outdoor-family',
     label: 'Outdoor family',
     blurb:
-      'Backlit by the sun, with a big octabox set back far enough to light every face evenly. Stopped down to f/5.6 so the whole family is sharp.',
+      'Backlit by the rising sun, with a big octabox set back far enough to light every face evenly. Stopped down to f/5.6 so the whole family is sharp. Try Seated: they sit on a park bench.',
     apply: (s) => {
       s.subject.people = 'group';
       return outdoorShoot(s);
@@ -522,7 +545,7 @@ export const SCENARIO_PRESETS: Preset[] = [
     blurb: 'A real workshop window to the side and no strobes at all. Notice how fast the light falls off across the face and the room.',
     apply: (s) => {
       setLights(s, {});
-      s.env = { ...s.env, mode: 'location', location: 'workshop', sunAzimuth: -70 };
+      s.env = { ...s.env, inShade: false, mode: 'location', location: 'workshop', sunAzimuth: -70 };
       s.camera = { ...s.camera, exposureMode: 'auto', exposureComp: 0, aperture: 2, whiteBalance: 5800 };
       s.subject.bokehLights = false;
       s.subject.turn = -20;
@@ -536,7 +559,7 @@ export const SCENARIO_PRESETS: Preset[] = [
     blurb: 'Low sun behind the subject gives a warm rim; expose for the face and let the background glow.',
     apply: (s) => {
       setLights(s, {});
-      s.env = { ...s.env, mode: 'location', location: 'sunset', sunAzimuth: 150 };
+      s.env = { ...s.env, inShade: false, mode: 'location', location: 'field_sunrise', sunAzimuth: 150 };
       standUp(s);
       s.camera.aperture = 2;
       s.camera.exposureMode = 'auto';
@@ -553,7 +576,7 @@ export const SCENARIO_PRESETS: Preset[] = [
     blurb: 'The whole sky becomes one giant softbox. Soft, flat, even light with gentle shadows under the brow and chin.',
     apply: (s) => {
       setLights(s, {});
-      s.env = { ...s.env, mode: 'location', location: 'park_overcast', sunAzimuth: -40 };
+      s.env = { ...s.env, inShade: false, mode: 'location', location: 'park_overcast', sunAzimuth: -40 };
       standUp(s);
       s.camera.aperture = 2.8;
       s.camera.exposureMode = 'auto';
@@ -571,12 +594,25 @@ export const SCENARIO_PRESETS: Preset[] = [
       setLights(s, {
         fill: { azimuth: 15, elevation: 10, distance: 1.8, modifier: 'umbrella', power: -1 },
       });
-      s.env = { ...s.env, mode: 'location', location: 'meadow', sunAzimuth: -30 };
+      s.env = { ...s.env, inShade: false, mode: 'location', location: 'quadrangle', sunAzimuth: -30 };
       standUp(s);
       s.camera.aperture = 5.6;
       s.camera.exposureMode = 'auto';
       s.camera.exposureComp = 0;
       s.camera.whiteBalance = 5600;
+      s.subject.bokehLights = false;
+      return HALF;
+    },
+  },
+  {
+    id: 'shade',
+    label: 'Open shade',
+    blurb: 'Step out of the sun into a building’s shadow: soft, even light on the face while the courtyard behind stays bright. The light is cool, so warm up the white balance.',
+    apply: (s) => {
+      setLights(s, {});
+      s.env = { ...s.env, inShade: true, mode: 'location', location: 'courtyard', sunAzimuth: 140 };
+      standUp(s);
+      s.camera = { ...s.camera, exposureMode: 'auto', exposureComp: 0, aperture: 2.8, whiteBalance: 6800 };
       s.subject.bokehLights = false;
       return HALF;
     },
@@ -589,9 +625,24 @@ export const SCENARIO_PRESETS: Preset[] = [
       setLights(s, {
         key: { azimuth: -40, elevation: 25, distance: 1.4, modifier: 'octabox', power: -4, kelvin: 5600 },
       });
-      s.env = { ...s.env, mode: 'location', location: 'sunset', sunAzimuth: 160 };
+      s.env = { ...s.env, inShade: false, mode: 'location', location: 'sunset', sunAzimuth: 160 };
       standUp(s);
       s.camera = { ...s.camera, exposureMode: 'manual', aperture: 4, iso: 100, shutter: 1 / 125, whiteBalance: 5600 };
+      s.subject.bokehLights = false;
+      return HALF;
+    },
+  },
+  {
+    id: 'street-strobe',
+    label: 'Night street + strobe',
+    blurb: 'Manual exposure on a lamp-lit street. The strobe sets the face (aperture and power); the shutter sets how much of the warm street glow comes through. Try 1/125, then 1/15.',
+    apply: (s) => {
+      setLights(s, {
+        key: { azimuth: -40, elevation: 25, distance: 1.4, modifier: 'octabox', power: -6, kelvin: 5600, gel: '#ffc58a' },
+      });
+      s.env = { ...s.env, inShade: false, mode: 'location', location: 'street_night', sunAzimuth: 0 };
+      standUp(s);
+      s.camera = { ...s.camera, exposureMode: 'manual', aperture: 2.8, iso: 800, shutter: 1 / 30, whiteBalance: 3400 };
       s.subject.bokehLights = false;
       return HALF;
     },
@@ -605,7 +656,7 @@ export const SCENARIO_PRESETS: Preset[] = [
         key: { azimuth: -35, elevation: 25, distance: 1.5, modifier: 'grid', size: 0.3, power: -7, kelvin: 4500 },
         rim: { azimuth: 150, elevation: 30, distance: 1.6, modifier: 'stripbox', power: -7, kelvin: 3200, gel: '#ffb070' },
       });
-      s.env = { ...s.env, mode: 'location', location: 'rooftop_night', sunAzimuth: 0, time: 21.5, weather: 'clear', haze: false };
+      s.env = { ...s.env, inShade: false, mode: 'location', location: 'rooftop_night', sunAzimuth: 0, time: 21.5, weather: 'clear', haze: false };
       s.camera = { ...s.camera, exposureMode: 'manual', aperture: 1.6, iso: 100, shutter: 1 / 30, whiteBalance: 4500 };
       s.subject.bokehLights = true;
       return HALF;
