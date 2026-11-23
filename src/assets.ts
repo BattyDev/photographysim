@@ -50,9 +50,11 @@ export function prepareModel(root: THREE.Object3D, cast = true, receive = true) 
 }
 
 /** A cloned scene from a glTF, uniformly scaled so its height is `height` m, standing on y = 0. */
-export async function placedModel(path: string, height?: number): Promise<THREE.Group> {
+export async function placedModel(path: string, height?: number, keep?: (name: string) => boolean): Promise<THREE.Group> {
   const gltf = await loadGLTF(path);
   const inner = gltf.scene.clone(true);
+  // Some files hold several variants side by side: keep only the wanted ones.
+  if (keep) for (const c of [...inner.children]) if (!keep(c.name)) inner.remove(c);
   const g = new THREE.Group();
   g.add(inner);
   const box = new THREE.Box3().setFromObject(inner);

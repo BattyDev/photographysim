@@ -88,6 +88,7 @@ export type SubjectModel = 'mannequin' | 'headscan' | 'bust';
 export type LocationId =
   | 'studio_loft'
   | 'workshop'
+  | 'living_room'
   | 'meadow'
   | 'sunset'
   | 'park_overcast'
@@ -128,6 +129,8 @@ export interface SubjectState {
   backgroundFigure: boolean;
   /** A boulder a few metres behind the subject (outdoor locations). */
   backgroundProp: boolean;
+  /** Picnic tables at middle and far distances (outdoor locations). */
+  picnic: boolean;
   bokehLights: boolean;
 }
 
@@ -238,6 +241,7 @@ export function defaultState(): SimState {
       foregroundProp: true,
       backgroundFigure: false,
       backgroundProp: false,
+      picnic: false,
       bokehLights: false,
     },
     env: {
@@ -431,6 +435,10 @@ export function groupView(s: SimState, k = 1): CameraView {
   return { ...v, distance: v.distance * k * (s.camera.focalLength / 70) };
 }
 
+/** Living room turned so the windows are behind the subject; key power for it. */
+const HOME_AZIMUTH = 180;
+const HOME_KEY = -4;
+
 const SHOWCASE_POSES: PoseId[] = ['turned', 'profile', 'overshoulder', 'chinup', 'thinker'];
 
 /**
@@ -551,6 +559,19 @@ export const SCENARIO_PRESETS: Preset[] = [
       s.subject.turn = -20;
       s.subject.pose = 'seated';
       return { distance: 2.4, height: 1.25, azimuth: 0, targetHeight: 1.05 };
+    },
+  },
+  {
+    id: 'home',
+    label: 'Family at home',
+    blurb:
+      'The family on the sofa in a real living room, with the windows behind them and an umbrella to camera left as the key. At f/4 the room falls softly out of focus behind them. Try Standing, or Solo.',
+    apply: (s) => {
+      s.env = { ...s.env, inShade: false, mode: 'location', location: 'living_room', sunAzimuth: HOME_AZIMUTH };
+      s.subject = { ...s.subject, model: 'mannequin', people: 'group', groupPose: 'seated', turn: 0, foregroundProp: false, backgroundFigure: false, bokehLights: false };
+      setLights(s, { key: { azimuth: -38, elevation: 22, distance: 2.8, modifier: 'umbrella', size: 1.5, power: HOME_KEY } });
+      s.camera = { ...s.camera, exposureMode: 'auto', exposureComp: 0, whiteBalance: 5200, focalLength: 50, aperture: 4, trackFocus: true };
+      return groupView(s);
     },
   },
   {

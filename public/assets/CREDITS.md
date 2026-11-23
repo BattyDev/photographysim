@@ -21,6 +21,13 @@ All third-party assets in `public/assets/`. Everything is CC0 (public domain) ex
 | Painted Wooden Bench | [Poly Haven](https://polyhaven.com/a/painted_wooden_bench) | `models/polyhaven/painted_wooden_bench/` |
 | Tree Stump 01 | [Poly Haven](https://polyhaven.com/a/tree_stump_01) | `models/polyhaven/tree_stump_01/` |
 | Boulder 01 | [Poly Haven](https://polyhaven.com/a/boulder_01) | `models/polyhaven/boulder_01/` |
+| Sofa 03 | [Poly Haven](https://polyhaven.com/a/sofa_03) | `models/polyhaven/sofa_03/` |
+| Mid Century Lounge Chair | [Poly Haven](https://polyhaven.com/a/mid_century_lounge_chair) | `models/polyhaven/mid_century_lounge_chair/` |
+| Coffee Table Round 01 | [Poly Haven](https://polyhaven.com/a/coffee_table_round_01) | `models/polyhaven/coffee_table_round_01/` |
+| Side Table 01 | [Poly Haven](https://polyhaven.com/a/side_table_01) | `models/polyhaven/side_table_01/` |
+| Pachira Aquatica 01 | [Poly Haven](https://polyhaven.com/a/pachira_aquatica_01) | `models/polyhaven/pachira_aquatica_01/` |
+| Wooden Picnic Table | [Poly Haven](https://polyhaven.com/a/wooden_picnic_table) | `models/polyhaven/wooden_picnic_table/` |
+| Outdoor Table Chair Set 01 | [Poly Haven](https://polyhaven.com/a/outdoor_table_chair_set_01) | `models/polyhaven/outdoor_table_chair_set_01/` |
 | Photo Studio Loft Hall HDRI | [Poly Haven](https://polyhaven.com/a/photo_studio_loft_hall) | `hdri/photo_studio_loft_hall_2k.hdr` |
 | Artist Workshop HDRI | [Poly Haven](https://polyhaven.com/a/artist_workshop) | `hdri/artist_workshop_2k.hdr` |
 | Meadow 2 HDRI | [Poly Haven](https://polyhaven.com/a/meadow_2) | `hdri/meadow_2_2k.hdr` |
@@ -33,4 +40,5 @@ All third-party assets in `public/assets/`. Everything is CC0 (public domain) ex
 | Beach Cloudy Bridge HDRI | [Poly Haven](https://polyhaven.com/a/beach_cloudy_bridge) | `hdri/beach_cloudy_bridge_2k.hdr` |
 | Forest Slope HDRI | [Poly Haven](https://polyhaven.com/a/forest_slope) | `hdri/forest_slope_2k.hdr` |
 | Cobblestone Street Night HDRI | [Poly Haven](https://polyhaven.com/a/cobblestone_street_night) | `hdri/cobblestone_street_night_2k.hdr` |
-| Detail layers for all twelve HDRIs | Poly Haven's full-size tonemapped JPGs of the same panoramas, re-encoded at 8192×4096 (q80) and 4096×2048 (q84) | `hdri/detail/<location>_8k.jpg`, `hdri/detail/<location>_4k.jpg` |
+| Lythwood Lounge HDRI | [Poly Haven](https://polyhaven.com/a/lythwood_lounge) | `hdri/lythwood_lounge_2k.hdr` |
+| Detail layers for all thirteen HDRIs | Poly Haven's full-size tonemapped JPGs of the same panoramas, re-encoded at 8192×4096 (q80) and 4096×2048 (q84) | `hdri/detail/<location>_8k.jpg`, `hdri/detail/<location>_4k.jpg` |

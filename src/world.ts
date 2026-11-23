@@ -167,6 +167,10 @@ export class World {
   /** Outdoor depth props: a tree stump in front, a boulder behind. */
   private stump = new THREE.Group();
   private boulder = new THREE.Group();
+  /** Living-room furniture around the sofa: armchair, tables, a potted tree. */
+  private livingSet = new THREE.Group();
+  /** Picnic tables at middle and far distances outdoors. */
+  private picnicSet = new THREE.Group();
   /**
    * Stands in for a building between the sun and the subject ("Subject in
    * shade"). It lives on its own layer, which only the sun's shadow camera
@@ -264,7 +268,7 @@ export class World {
     this.props.add(this.plant);
     this.stump.position.set(-0.75, 0, 1.45);
     this.boulder.position.set(1.7, 0, -5.5);
-    this.props.add(this.stump, this.boulder);
+    this.props.add(this.stump, this.boulder, this.livingSet, this.picnicSet);
 
     this.shadeCaster = new THREE.Mesh(new THREE.BoxGeometry(16, 40, 1), new THREE.MeshBasicMaterial());
     this.shadeCaster.castShadow = true;
@@ -331,6 +335,39 @@ export class World {
       m.rotation.y = rot;
       into.add(m);
     });
+  }
+
+  /** Furniture for the living room, laid out at near, middle and far distances. */
+  private loadLivingSet() {
+    const at = (m: THREE.Object3D, x: number, z: number, rot: number) => {
+      m.position.set(x, 0, z);
+      m.rotation.y = rot;
+      this.livingSet.add(m);
+    };
+    const P = 'models/polyhaven/';
+    return Promise.all([
+      placedModel(`${P}mid_century_lounge_chair/mid_century_lounge_chair_1k.gltf`).then((m) => at(m, -2.15, -1.7, 0.7)),
+      placedModel(`${P}side_table_01/side_table_01_1k.gltf`).then((m) => at(m, 1.75, -0.35, 0)),
+      placedModel(`${P}coffee_table_round_01/coffee_table_round_01_1k.gltf`).then((m) => at(m, 1.55, 1.6, 0.3)),
+      placedModel(`${P}pachira_aquatica_01/pachira_aquatica_01_1k.gltf`, 1.7, (n) => n.endsWith('_b')).then((m) => at(m, 2.2, -2.6, 0.4)),
+    ]);
+  }
+
+  /** A picnic table a few metres behind the subject and a bistro set far behind. */
+  private loadPicnic() {
+    const P = 'models/polyhaven/';
+    return Promise.all([
+      placedModel(`${P}wooden_picnic_table/wooden_picnic_table_1k.gltf`).then((m) => {
+        m.position.set(-1.5, 0, -3.3);
+        m.rotation.y = 0.35;
+        this.picnicSet.add(m);
+      }),
+      placedModel(`${P}outdoor_table_chair_set_01/outdoor_table_chair_set_01_1k.gltf`).then((m) => {
+        m.position.set(1.7, 0, -7.5);
+        m.rotation.y = -0.5;
+        this.picnicSet.add(m);
+      }),
+    ]);
   }
 
   private loadPlant() {
@@ -449,6 +486,9 @@ export class World {
     const outdoors = mode === 'location' && locationSpec(s.env.location).proxy.kind === 'open';
     if (s.subject.foregroundProp && !outdoors) this.need('plant', () => this.loadPlant());
     if (s.subject.foregroundProp && outdoors) this.need('stump', () => this.loadProp('tree_stump_01/tree_stump_01_1k.gltf', this.stump, 0.9));
+    const home = mode === 'location' && s.env.location === 'living_room';
+    if (home) this.need('living', () => this.loadLivingSet());
+    if (s.subject.picnic && outdoors) this.need('picnic', () => this.loadPicnic());
     if (s.subject.backgroundProp && outdoors) this.need('boulder', () => this.loadProp('boulder_01/boulder_01_1k.gltf', this.boulder, -0.5, 1.1));
     this.shadeCaster.visible = false;
     if (s.subject.backgroundFigure) this.need('figure', () => this.loadBackgroundFigure());
@@ -588,6 +628,8 @@ export class World {
     this.plant.visible = s.subject.foregroundProp && !outdoors;
     this.stump.visible = s.subject.foregroundProp && outdoors;
     this.boulder.visible = s.subject.backgroundProp && outdoors;
+    this.livingSet.visible = home;
+    this.picnicSet.visible = s.subject.picnic && outdoors;
     if (this.figure) {
       this.figure.root.visible = s.subject.backgroundFigure;
       if (open) this.figure.root.position.set(1.2, 0, -4.5);

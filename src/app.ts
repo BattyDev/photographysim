@@ -226,7 +226,8 @@ export class App {
   /** Push the whole state into the scene and refresh the UI. */
   update() {
     const s = this.state;
-    this.subject.apply(s.subject, s.env.mode === 'location' && locationSpec(s.env.location).proxy.kind === 'open');
+    const loc = s.env.mode === 'location' ? s.env.location : null;
+    this.subject.apply(s.subject, !loc ? 'studio' : locationSpec(loc).proxy.kind === 'open' ? 'outdoors' : loc === 'living_room' ? 'home' : 'studio');
     this.subject.eyePosition(this.eye);
 
     this.camera.setFocalLength(s.camera.focalLength);
@@ -1179,6 +1180,8 @@ export class App {
       });
       const boulder = P.toggle(props, { label: 'Boulder behind', get: () => s().subject.backgroundProp, set: (v) => (s().subject.backgroundProp = v) });
       P.showIf(boulder, outdoors);
+      const picnic = P.toggle(props, { label: 'Picnic tables', get: () => s().subject.picnic, set: (v) => (s().subject.picnic = v), hint: 'One a few metres behind, one far back: watch them blur as you open the aperture.' });
+      P.showIf(picnic, outdoors);
       P.toggle(props, { label: 'Second person behind', get: () => s().subject.backgroundFigure, set: (v) => (s().subject.backgroundFigure = v) });
       P.toggle(props, { label: 'String lights (bokeh)', get: () => s().subject.bokehLights, set: (v) => (s().subject.bokehLights = v) });
     }

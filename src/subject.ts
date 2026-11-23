@@ -341,7 +341,13 @@ async function loadBust(): Promise<{ group: THREE.Group; eye: THREE.Vector3 }> {
   return { group, eye: new THREE.Vector3(0, box.min.y + (box.max.y - box.min.y) * 0.8, box.max.z - 0.07) };
 }
 
-type SeatId = 'box' | 'pair' | 'bench';
+type SeatId = 'box' | 'pair' | 'bench' | 'sofa';
+
+/** Where the subject is: decides what they sit on. */
+export type Setting = 'studio' | 'home' | 'outdoors';
+
+/** Front edge of the living-room sofa's seat, relative to the hips of a seated figure. */
+const SOFA_Z = -0.24;
 
 // Apple boxes: the plywood boxes every portrait studio sits people on. A
 // "full apple" is 20 × 12 × 8 in; stood on end it makes a 51 cm seat.
@@ -450,6 +456,16 @@ const SEATS: Record<SeatId, (loaded: () => void) => THREE.Group> = {
     });
     return g;
   },
+  // At home the family sits on a three-seat sofa (Poly Haven, CC0).
+  sofa: (loaded) => {
+    const g = new THREE.Group();
+    placedModel('models/polyhaven/sofa_03/sofa_03_1k.gltf').then((m) => {
+      m.position.z = SOFA_Z;
+      g.add(m);
+      loaded();
+    });
+    return g;
+  },
 };
 
 // ------------------------------------------------------------------ subject
@@ -464,6 +480,8 @@ export class Subject {
   private requested = new Set<string>();
   private state: SubjectState | null = null;
   private ray = new THREE.Raycaster();
+  /** On the sofa the children sit too, at the ends. */
+  private onSofa = false;
 
   constructor(private onLoaded: () => void) {}
 
@@ -477,12 +495,17 @@ export class Subject {
     return this.state?.people === 'group';
   }
 
-  /** Bring the scene in line with the state. `outdoors` seats a group on a bench rather than apple boxes. */
-  apply(s: SubjectState, outdoors = false) {
+  /**
+   * Bring the scene in line with the state. `setting` picks the seat: apple
+   * boxes in the studio, a park bench outdoors, the sofa at home.
+   */
+  apply(s: SubjectState, setting: Setting = 'studio') {
     this.state = s;
     const group = s.people === 'group';
     const model = group ? 'mannequin' : s.model;
-    const seatId: SeatId | null = group ? (GROUP_POSES[s.groupPose].seated ? (outdoors ? 'bench' : 'pair') : null) : model === 'mannequin' && s.pose === 'seated' ? 'box' : null;
+    const sits = group ? GROUP_POSES[s.groupPose].seated : model === 'mannequin' && s.pose === 'seated';
+    const seatId: SeatId | null = !sits ? null : setting === 'home' ? 'sofa' : group ? (setting === 'outdoors' ? 'bench' : 'pair') : 'box';
+    this.onSofa = seatId === 'sofa';
 
     // Fetch what this view needs.
     if (model === 'mannequin' && !group) {
@@ -532,7 +555,8 @@ export class Subject {
     if (!group && this.solo) this.solo.setPose(s.pose, 1, this.seatHeight(seat, this.solo));
     if (group && this.members.length) {
       const spec = GROUP_POSES[s.groupPose];
-      spec.members.forEach((ms, i) => {
+      spec.members.forEach((m0, i) => {
+        const ms = this.onSofa && m0.pose !== 'seated' ? { ...m0, pose: 'seated' as const, x: Math.sign(m0.x) * 0.8, z: -0.02, yaw: -Math.sign(m0.x) * 6 } : m0;
         const { figure, holder } = this.members[i];
         holder.position.set(ms.x, 0, ms.z);
         holder.rotation.y = D(ms.yaw);

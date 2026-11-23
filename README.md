@@ -27,7 +27,8 @@ Built with Three.js + Vite + TypeScript. See [PLAN.md](PLAN.md) for the design b
   at sunrise, the low sun as a backlight, octabox key) and Indoor (studio paper,
   softbox key). **People** swaps between one person and a family of four, and
   the lights move back and power up to cover the group. Group poses: standing,
-  casual, or seated (on apple boxes indoors, a park bench outdoors).
+  casual, or seated (on apple boxes in the studio, a park bench outdoors, the
+  sofa in the living room, where the children sit too).
 - **Subject & scene**: three ready-made subjects:
   - a rigged wooden mannequin with 9 poses, set by rotating its bones. Several
     are there to show light off: three-quarter (short vs broad), profile (split),
@@ -37,8 +38,11 @@ Built with Three.js + Vite + TypeScript. See [PLAN.md](PLAN.md) for the design b
 
   Turn control for all of them. Seated poses sit on apple boxes, the plywood
   boxes portrait studios use. Depth props: something in front (a potted plant
-  indoors, a tree stump outdoors), a boulder a few metres behind (outdoors), a
-  second mannequin, string lights and street lamps for bokeh. Subject-to-backdrop
+  indoors, a tree stump outdoors), a boulder a few metres behind (outdoors),
+  picnic tables at about 4 m and 8 m behind (outdoors), a second mannequin,
+  string lights and street lamps for bokeh. The living room comes furnished:
+  sofa, mid-century armchair, round coffee table, side table and a potted
+  money tree, at near, middle and far distances. Subject-to-backdrop
   distance.
 - **Environments**:
   - **Studio**: a seamless paper backdrop as it stands in a real studio: a
@@ -50,8 +54,8 @@ Built with Three.js + Vite + TypeScript. See [PLAN.md](PLAN.md) for the design b
   - **Open sky** (simulated sun and sky) is hidden for now: without realistic
     surroundings it was a flat plane. Its code stays wired up for when real
     outdoor settings arrive.
-  - **Location**: twelve real HDRI panoramas, calibrated to real lux:
-    - indoors: studio loft, artist workshop
+  - **Location**: thirteen real HDRI panoramas, calibrated to real lux:
+    - indoors: studio loft, artist workshop, living room
     - sun: meadow (midday), field at sunrise, city courtyard, quadrangle
       (midday), Venice sunset
     - soft light: Tiergarten park, beach under a bridge (overcast), forest
@@ -68,9 +72,9 @@ Built with Three.js + Vite + TypeScript. See [PLAN.md](PLAN.md) for the design b
     their true distance. A sharp 8k photo (4k on phones) adds fine detail on
     top of the 2k HDR, loaded only for the location on screen.
 - **Quick starts**: 8 lighting setups (Rembrandt, loop, butterfly, clamshell,
-  split, rim, high-key, low-key) and 9 scenarios (studio, window light, golden
-  hour, overcast, midday + fill flash, open shade, sunset + strobe, night street
-  + strobe, night bokeh).
+  split, rim, high-key, low-key) and 10 scenarios (studio, window light, family
+  at home, golden hour, overcast, midday + fill flash, open shade, sunset +
+  strobe, night street + strobe, night bokeh).
 - Top-view setup diagram (drag lights), click lights in 3D to move them with a
   gizmo, and **Save photo** to download a PNG.
 - **Keyboard shortcuts**: press `?` or the keyboard button in the header for

@@ -32,6 +32,10 @@ export const LOCATIONS: LocationSpec[] = [
   // Rooms measured from where the floor and ceiling meet the walls in each panorama.
   { id: 'studio_loft', label: 'Photo studio loft', file: 'photo_studio_loft_hall_2k.hdr', lux: 250, sun: false, height: 1.6, proxy: { kind: 'room', x: [-2.3, 2.2], z: [-3.03, 2.52], ceiling: 3.48, yaw: 15 }, kelvin: 4800, blurb: 'Bright studio hall with big windows: soft, mixed ambient.' },
   { id: 'workshop', label: 'Artist workshop', file: 'artist_workshop_2k.hdr', lux: 600, sun: false, height: 1.5, proxy: { kind: 'room', x: [-3.21, 1.9], z: [-3.59, 3.46], ceiling: 3.4, yaw: -30 }, kelvin: 5800, blurb: 'Interior lit by windows: classic soft, directional window light.' },
+  // A lounge in a country house: overcast daylight through a wall of windows,
+  // warm lamps in the room through the arch. The box is the main room; the
+  // capture point stands in the archway to the second room.
+  { id: 'living_room', label: 'Living room', file: 'lythwood_lounge_2k.hdr', lux: 300, sun: false, height: 1.6, proxy: { kind: 'room', x: [-3.5, 4.8], z: [-6, 7.7], ceiling: 3.1, yaw: 28 }, kelvin: 5000, blurb: 'A real lounge: soft overcast light through a wall of windows, warm lamps through the arch. Sofa, armchair and side tables for a family at home.' },
   { id: 'meadow', label: 'Meadow, midday', file: 'meadow_2_2k.hdr', lux: 60000, sun: true, height: 1.6, proxy: { kind: 'open', radius: 80 }, kelvin: 5600, blurb: 'Hard high sun and a blue sky: the toughest light for portraits.' },
   { id: 'sunset', label: 'Venice, sunset', file: 'venice_sunset_2k.hdr', lux: 1500, sun: true, height: 1.6, proxy: { kind: 'open', radius: 60 }, kelvin: 3200, blurb: 'Low warm sun skimming the water: golden-hour colour and long shadows.' },
   { id: 'park_overcast', label: 'Tiergarten park', file: 'tiergarten_2k.hdr', lux: 12000, sun: false, height: 1.6, proxy: { kind: 'open', radius: 60 }, kelvin: 6500, blurb: 'Park under soft sky: gentle, even, flattering light.' },
