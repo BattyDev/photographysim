@@ -30,16 +30,22 @@ Built with Three.js + Vite + TypeScript. See [PLAN.md](PLAN.md) for the design b
   casual, or seated (on apple boxes in the studio, a park bench outdoors, the
   sofa in the living room, where the children sit too).
 - **Subject & scene**: three ready-made subjects:
-  - a real-looking person (Microsoft Rocketbox avatars) with 9 poses. Several
+  - a real-looking person (Microsoft Rocketbox avatars) with 15 poses. Several
     are there to show light off: three-quarter (short vs broad), profile (split),
-    over the shoulder (rim), chin up (butterfly), hand to chin (hand shadows).
-    The family is a father, mother, son and daughter. Poses are set on an
+    over the shoulder (rim), chin up (butterfly), hand to chin (hand shadows),
+    hand in hair (light along the raised arm). The rest are everyday portrait
+    poses: relaxed, hand on hip, arms crossed, hands clasped, hands in pockets,
+    looking away, walking, seated, and seated leaning in. Standing poses put
+    the weight on one leg (contrapposto), with the hips and shoulders tilted
+    against each other, and the fingers curl as a relaxed hand does.
+    The family is a father, mother, son and daughter, each in a different pose
+    within a group layout. Poses are set on an
     invisible rigged mannequin and copied joint by joint onto each person's
     skeleton (`src/person.ts`), so one set of poses drives everyone.
   - a scanned human head, for studying light patterns on a real face
   - a marble bust
 
-  Turn control for all of them. Seated poses sit on apple boxes, the plywood
+  Turn control for all of them. The seated poses sit on apple boxes, the plywood
   boxes portrait studios use. Depth props: something in front (a potted plant
   indoors, a tree stump outdoors), a boulder a few metres behind (outdoors),
   picnic tables at about 4 m and 8 m behind (outdoors), a second person,

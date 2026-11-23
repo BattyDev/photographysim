@@ -8,7 +8,7 @@ import * as THREE from 'three';
 import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { loadGLTF, loadTexture, placedModel, prepareModel } from './assets';
 import { loadPerson, type PersonId } from './person';
-import type { GroupPoseId, PoseId, SubjectState } from './state';
+import { isSeated, type GroupPoseId, type PoseId, type SubjectState } from './state';
 
 const D = THREE.MathUtils.degToRad;
 
@@ -17,99 +17,142 @@ const D = THREE.MathUtils.degToRad;
 type BoneTurn = [bone: string, axis: 'x' | 'y' | 'z', deg: number];
 
 // The model faces +z, so its left is +x (camera right). Rest pose is an A-pose,
-// arms ~60° down. +y turns rotate the face toward camera right; −x tips the chin up.
-const ARMS_RELAXED: BoneTurn[] = [
-  ['LeftArm', 'z', -24],
-  ['RightArm', 'z', 24],
-  ['LeftForeArm', 'x', -12],
-  ['RightForeArm', 'x', -12],
+// arms ~60° down. +y turns rotate the face toward camera right; −x tips the chin up;
+// +z tilts the head toward camera left. UpLeg −x swings a thigh forward, Leg +x bends the knee.
+
+/**
+ * Weight on one leg (contrapposto), the way people really stand: the hips drop
+ * on the free side, the shoulders tilt back the other way, the free knee bends
+ * and its foot turns out. `side` is the person's own left or right; `k` scales it.
+ * List it before any Hips 'y' turn so the tilt is in the body's own frame.
+ */
+function weightOn(side: 'left' | 'right', k = 1): BoneTurn[] {
+  const s = side === 'right' ? 1 : -1;
+  const [free, stand] = side === 'right' ? ['Left', 'Right'] : ['Right', 'Left'];
+  return [
+    ['Hips', 'z', -5 * s * k],
+    ['Spine02', 'z', 6 * s * k],
+    ['Spine', 'z', 2 * s * k],
+    [`${free}UpLeg`, 'z', 10 * s * k],
+    [`${free}UpLeg`, 'x', -8 * k],
+    [`${free}UpLeg`, 'y', 14 * s * k],
+    [`${free}Leg`, 'x', 16 * k],
+    [`${free}Foot`, 'x', 6 * k],
+    [`${stand}UpLeg`, 'z', 8 * s * k],
+    [`${stand}UpLeg`, 'y', -6 * s * k],
+  ];
+}
+
+/** Arms hanging loose, elbows softly bent, not quite mirror images. */
+const ARMS_LOOSE: BoneTurn[] = [
+  ['LeftArm', 'z', -32],
+  ['LeftArm', 'x', 2],
+  ['LeftForeArm', 'x', -22],
+  ['LeftForeArm', 'y', -4],
+  ['RightArm', 'z', 30],
+  ['RightArm', 'x', -4],
+  ['RightForeArm', 'x', -30],
+  ['RightForeArm', 'y', 8],
 ];
 
 const POSES: Record<PoseId, BoneTurn[]> = {
-  standing: [...ARMS_RELAXED, ['LeftUpLeg', 'z', 1.5], ['RightUpLeg', 'z', -1.5]],
+  // Relaxed: weight on one leg, a slight angle and head tilt.
+  standing: [
+    ...weightOn('right'),
+    ['Hips', 'y', -8],
+    ['neck', 'x', 2],
+    ['Head', 'z', -4],
+    ['Head', 'y', 6],
+    ...ARMS_LOOSE,
+  ],
   // Body angled ~40° to camera left, face back toward the lens: short/broad light.
   turned: [
+    ...weightOn('right', 0.9),
     ['Hips', 'y', -38],
     ['Spine01', 'y', 6],
     ['Spine', 'y', 8],
     ['neck', 'y', 8],
     ['Head', 'y', 10],
-    ['Head', 'z', -4],
-    ['LeftArm', 'z', -22],
-    ['RightArm', 'z', 26],
-    ['LeftForeArm', 'x', -18],
-    ['RightForeArm', 'x', -10],
-    ['RightUpLeg', 'x', -4],
-    ['RightLeg', 'x', 8],
+    ['Head', 'z', -5],
+    ['LeftArm', 'z', -30],
+    ['LeftArm', 'x', 4],
+    ['LeftForeArm', 'x', -24],
+    ['RightArm', 'z', 28],
+    ['RightArm', 'x', -6],
+    ['RightForeArm', 'x', -28],
+    ['RightForeArm', 'y', 10],
   ],
   // Full side view: split and rim light, the edge of the face against the background.
   profile: [
+    ...weightOn('right', 0.7),
     ['Hips', 'y', -82],
     ['Spine', 'y', -4],
     ['Head', 'x', -4],
-    ['LeftArm', 'z', -24],
-    ['RightArm', 'z', 24],
-    ['LeftForeArm', 'x', -10],
-    ['RightForeArm', 'x', -14],
-    ['LeftUpLeg', 'x', -3],
-    ['LeftLeg', 'x', 6],
+    ['Head', 'z', -3],
+    ['LeftArm', 'z', -30],
+    ['LeftArm', 'x', -4],
+    ['LeftForeArm', 'x', -26],
+    ['RightArm', 'z', 30],
+    ['RightArm', 'x', 4],
+    ['RightForeArm', 'x', -18],
   ],
   // Back to camera, looking back over the shoulder: shows off rim/hair light.
   overshoulder: [
+    ...weightOn('left', 0.8),
     ['Hips', 'y', 150],
     ['Spine01', 'y', -18],
     ['Spine', 'y', -22],
     ['neck', 'y', -34],
     ['Head', 'y', -44],
     ['Head', 'z', 6],
-    ['LeftArm', 'z', -22],
-    ['RightArm', 'z', 24],
-    ['LeftForeArm', 'x', -10],
-    ['RightForeArm', 'x', -10],
+    ...ARMS_LOOSE,
   ],
   // Face lifted into the light: catchlights, butterfly shadow, a lit neck.
   chinup: [
+    ...weightOn('right', 0.7),
+    ['Hips', 'y', -12],
     ['neck', 'x', -8],
     ['Head', 'x', -18],
     ['Head', 'y', -12],
-    ['Hips', 'y', -12],
-    ['LeftArm', 'z', -22],
-    ['RightArm', 'z', 22],
-    ['LeftForeArm', 'x', -14],
-    ['RightForeArm', 'x', -14],
+    ['Head', 'z', 4],
+    ...ARMS_LOOSE,
   ],
   // Hand to chin: the hand and forearm catch light and throw shadow near the face.
   thinker: [
+    ...weightOn('right', 0.6),
     ['Hips', 'y', -18],
     ['Head', 'x', 6],
     ['Head', 'y', 6],
+    ['Head', 'z', -3],
     // Solved so the right wrist rests just under the chin with the forearm upright.
     ['RightArm', 'x', -70],
     ['RightArm', 'z', 60],
     ['RightForeArm', 'x', -106],
     ['RightForeArm', 'y', 140],
-    ['LeftArm', 'z', -24],
-    ['LeftForeArm', 'x', -12],
+    ['LeftArm', 'z', -32],
+    ['LeftForeArm', 'x', -22],
   ],
   hip: [
+    ...weightOn('left', 1.2),
     ['Hips', 'y', -14],
-    ['Hips', 'z', -3],
-    ['Spine01', 'z', 3],
     ['Spine', 'y', 6],
     ['Head', 'y', 6],
     ['Head', 'z', 5],
-    ['RightArm', 'z', 24],
-    ['RightForeArm', 'x', -10],
+    ['RightArm', 'z', 30],
+    ['RightArm', 'x', -4],
+    ['RightForeArm', 'x', -26],
+    ['RightForeArm', 'y', 8],
     ['LeftArm', 'z', 8],
     ['LeftArm', 'y', 30],
     ['LeftForeArm', 'z', -82],
     ['LeftHand', 'z', 20],
-    ['RightUpLeg', 'z', -4],
-    ['RightUpLeg', 'x', -5],
-    ['RightLeg', 'x', 10],
   ],
   crossed: [
+    ...weightOn('left', 0.7),
+    ['Hips', 'y', 6],
     ['Head', 'x', 3],
+    ['Head', 'z', 3],
+    ['Head', 'y', -4],
     ['LeftArm', 'z', -24],
     ['LeftArm', 'x', -8],
     ['RightArm', 'z', 24],
@@ -118,28 +161,162 @@ const POSES: Record<PoseId, BoneTurn[]> = {
     ['LeftForeArm', 'y', -78],
     ['RightForeArm', 'x', -72],
     ['RightForeArm', 'y', 74],
+  ],
+  // Hands loosely clasped in front at the waist.
+  clasped: [
+    ...weightOn('right', 0.7),
+    ['Hips', 'y', -10],
+    ['Head', 'z', -5],
+    ['Head', 'y', 4],
+    ['Head', 'x', 3],
+    ['LeftArm', 'z', -30],
+    ['LeftArm', 'x', -8],
+    ['LeftForeArm', 'x', -26],
+    ['LeftForeArm', 'y', -62],
+    ['RightArm', 'z', 30],
+    ['RightArm', 'x', -8],
+    ['RightForeArm', 'x', -26],
+    ['RightForeArm', 'y', 62],
+  ],
+  // Hands in the front pockets, thumbs out.
+  pockets: [
+    ...weightOn('right', 0.8),
+    ['Hips', 'y', -8],
+    ['Head', 'z', -3],
+    ['Head', 'y', 6],
+    ['Head', 'x', -2],
+    ['LeftArm', 'z', -20],
+    ['LeftArm', 'x', 10],
+    ['LeftForeArm', 'x', -32],
+    ['LeftForeArm', 'y', -34],
+    ['LeftHand', 'z', -20],
+    ['RightArm', 'z', 20],
+    ['RightArm', 'x', 10],
+    ['RightForeArm', 'x', -32],
+    ['RightForeArm', 'y', 34],
+    ['RightHand', 'z', 20],
+  ],
+  // Hand behind the head, elbow out: opens up the body and lifts the arm into the light.
+  hair: [
+    ...weightOn('right', 0.8),
+    ['Hips', 'y', -12],
+    ['Head', 'z', 8],
+    ['Head', 'y', 6],
+    ['Head', 'x', 2],
+    ['LeftArm', 'z', -30],
+    ['LeftArm', 'x', -2],
+    ['LeftForeArm', 'x', -24],
+    ['LeftForeArm', 'y', -6],
+    ['RightForeArm', 'z', -128],
+    ['RightArm', 'z', -84],
+    ['RightArm', 'x', -32],
+    ['RightHand', 'x', 30],
+  ],
+  // Candid: body angled one way, face turned off to the other side, eyes off the lens.
+  lookaway: [
+    ...weightOn('left', 0.9),
+    ['Hips', 'y', -22],
+    ['Spine', 'y', -6],
+    ['neck', 'y', 24],
+    ['neck', 'x', 4],
+    ['Head', 'y', 34],
+    ['Head', 'x', 8],
+    ['Head', 'z', -6],
+    ['LeftArm', 'z', -30],
+    ['LeftArm', 'x', -4],
+    ['LeftForeArm', 'x', -26],
+    ['LeftForeArm', 'y', -6],
+    ['RightArm', 'z', 30],
+    ['RightArm', 'x', 4],
+    ['RightForeArm', 'x', -18],
+    ['RightForeArm', 'y', 6],
+  ],
+  // Mid-stride toward the camera, arms swinging against the legs.
+  walking: [
+    ['Hips', 'y', -12],
+    ['Spine', 'y', 8],
+    ['Head', 'y', 6],
+    ['Head', 'z', -2],
+    ['neck', 'x', -2],
+    ['LeftUpLeg', 'x', -17],
+    ['LeftLeg', 'x', 8],
+    ['LeftFoot', 'x', -8],
+    ['RightUpLeg', 'x', 11],
+    ['RightLeg', 'x', 20],
+    ['RightFoot', 'x', 12],
     ['LeftUpLeg', 'z', 2],
-    ['RightUpLeg', 'z', -2],
+    ['RightUpLeg', 'z', -1],
+    ['LeftArm', 'z', -30],
+    ['LeftArm', 'x', 12],
+    ['LeftForeArm', 'x', -14],
+    ['RightArm', 'z', 30],
+    ['RightArm', 'x', -14],
+    ['RightForeArm', 'x', -34],
+    ['RightForeArm', 'y', 10],
   ],
   seated: [
     ['LeftUpLeg', 'x', -84],
     ['RightUpLeg', 'x', -80],
-    ['LeftUpLeg', 'y', 6],
-    ['RightUpLeg', 'y', -8],
+    // Knees together, so a skirt drapes over them instead of stretching flat.
+    ['LeftUpLeg', 'y', -3],
+    ['RightUpLeg', 'y', 3],
+    ['LeftUpLeg', 'z', -3],
+    ['RightUpLeg', 'z', 3],
     ['LeftLeg', 'x', 82],
     ['RightLeg', 'x', 74],
     ['Spine01', 'x', 4],
+    ['Spine', 'y', 4],
     ['Head', 'x', -3],
-    ['LeftArm', 'z', -18],
-    ['LeftArm', 'x', -28],
-    ['RightArm', 'z', 18],
-    ['RightArm', 'x', -28],
-    ['LeftForeArm', 'x', -42],
+    ['Head', 'z', -4],
+    ['LeftArm', 'z', -22],
+    ['LeftArm', 'x', -14],
+    ['RightArm', 'z', 22],
+    ['RightArm', 'x', -18],
+    ['LeftForeArm', 'x', -58],
     ['LeftForeArm', 'y', -22],
-    ['RightForeArm', 'x', -42],
+    ['RightForeArm', 'x', -54],
     ['RightForeArm', 'y', 22],
   ],
+  // Seated, leaning forward with the forearms on the thighs, looking up at the lens.
+  leaning: [
+    ['LeftUpLeg', 'x', -80],
+    ['RightUpLeg', 'x', -84],
+    // Knees together, so a skirt drapes over them instead of stretching flat.
+    ['LeftUpLeg', 'y', -2],
+    ['RightUpLeg', 'y', 2],
+    ['LeftUpLeg', 'z', -3],
+    ['RightUpLeg', 'z', 3],
+    ['LeftLeg', 'x', 70],
+    ['RightLeg', 'x', 84],
+    ['Spine02', 'x', 20],
+    ['Spine01', 'x', 14],
+    ['Spine', 'x', 8],
+    ['neck', 'x', -14],
+    ['Head', 'x', -20],
+    ['Head', 'z', -4],
+    ['LeftArm', 'z', -26],
+    ['LeftArm', 'x', -20],
+    ['RightArm', 'z', 26],
+    ['RightArm', 'x', -20],
+    ['LeftForeArm', 'x', -40],
+    ['LeftForeArm', 'y', -50],
+    ['RightForeArm', 'x', -40],
+    ['RightForeArm', 'y', 50],
+  ],
 };
+
+/** How far the fingers curl in each pose (1 = gently relaxed). The mannequin has no fingers; the people do. */
+export const HAND_CURL: Partial<Record<PoseId, number>> = {
+  clasped: 1.6,
+  pockets: 1.3,
+  crossed: 1.4,
+  hip: 0.6,
+  hair: 0.85,
+  leaning: 1.4,
+};
+
+// Dev only: lets poses be tried live from the console (window.__poses).
+if (import.meta.env.DEV) (window as unknown as { __poses: typeof POSES }).__poses = POSES;
 
 const AXES = { x: new THREE.Vector3(1, 0, 0), y: new THREE.Vector3(0, 1, 0), z: new THREE.Vector3(0, 0, 1) };
 
@@ -237,7 +414,7 @@ export class Figure implements Poseable {
       bone.quaternion.premultiply(pq.clone().invert().multiply(rq).multiply(pq));
       bone.updateMatrixWorld(true);
     }
-    if (id === 'seated') {
+    if (isSeated(id)) {
       // Drop the figure until the backs of the thighs sit on the seat.
       const hipY = hips.getWorldPosition(new THREE.Vector3()).y;
       this.root.position.y = seatY + 0.07 * scale - hipY;
@@ -283,10 +460,10 @@ export const GROUP_POSES: Record<GroupPoseId, { label: string; members: MemberSp
   standing: {
     label: 'Standing',
     members: [
-      { scale: 1, x: -0.34, z: -0.24, yaw: 10, pose: 'standing' },
+      { scale: 1, x: -0.34, z: -0.24, yaw: 10, pose: 'pockets' },
       { scale: 0.93, x: 0.33, z: -0.22, yaw: -12, pose: 'standing' },
-      { scale: 0.72, x: -0.15, z: 0.26, yaw: 6, pose: 'standing' },
-      { scale: 0.58, x: 0.25, z: 0.3, yaw: -8, pose: 'standing' },
+      { scale: 0.72, x: -0.15, z: 0.26, yaw: 6, pose: 'pockets' },
+      { scale: 0.58, x: 0.25, z: 0.3, yaw: -8, pose: 'clasped' },
     ],
   },
   casual: {
@@ -294,22 +471,25 @@ export const GROUP_POSES: Record<GroupPoseId, { label: string; members: MemberSp
     members: [
       { scale: 1, x: -0.15, z: -0.2, yaw: 18, pose: 'crossed' },
       { scale: 0.93, x: 0.6, z: -0.18, yaw: -20, pose: 'hip' },
-      { scale: 0.72, x: -0.77, z: 0.12, yaw: 22, pose: 'turned' },
-      { scale: 0.58, x: 0.21, z: 0.32, yaw: -6, pose: 'chinup' },
+      { scale: 0.72, x: -0.77, z: 0.12, yaw: 22, pose: 'lookaway' },
+      { scale: 0.58, x: 0.21, z: 0.32, yaw: -6, pose: 'walking' },
     ],
   },
   seated: {
     label: 'Seated',
     seated: true,
     members: [
-      { scale: 1, x: -0.42, z: -0.02, yaw: 4, pose: 'seated' },
+      { scale: 1, x: -0.42, z: -0.02, yaw: 4, pose: 'leaning' },
       { scale: 0.93, x: 0.42, z: -0.02, yaw: -4, pose: 'seated' },
       // The children stand behind the seat, between and behind their parents.
-      { scale: 0.72, x: -0.86, z: -0.66, yaw: 10, pose: 'standing' },
+      { scale: 0.72, x: -0.86, z: -0.66, yaw: 10, pose: 'pockets' },
       { scale: 0.58, x: 0.86, z: -0.64, yaw: -10, pose: 'standing' },
     ],
   },
 };
+
+// Dev only: lets the group layouts be tried live from the console (window.__group).
+if (import.meta.env.DEV) (window as unknown as { __group: typeof GROUP_POSES }).__group = GROUP_POSES;
 
 // ------------------------------------------------------------------ others
 
@@ -469,7 +649,7 @@ const SEATS: Record<SeatId, (loaded: () => void) => THREE.Group> = {
   // One box under each seated adult of the family.
   pair: () => {
     const g = new THREE.Group();
-    for (const m of GROUP_POSES.seated.members.filter((m) => m.pose === 'seated')) {
+    for (const m of GROUP_POSES.seated.members.filter((m) => isSeated(m.pose))) {
       const b = appleBox();
       b.position.set(m.x, b.position.y, m.z - 0.06);
       b.rotation.y = D(m.yaw);
@@ -534,7 +714,7 @@ export class Subject {
     this.state = s;
     const group = s.people === 'group';
     const model = group ? 'mannequin' : s.model;
-    const sits = group ? GROUP_POSES[s.groupPose].seated : model === 'mannequin' && s.pose === 'seated';
+    const sits = group ? GROUP_POSES[s.groupPose].seated : model === 'mannequin' && isSeated(s.pose);
     const seatId: SeatId | null = !sits ? null : setting === 'home' ? 'sofa' : group ? (setting === 'outdoors' ? 'bench' : 'pair') : 'box';
     this.onSofa = seatId === 'sofa';
 
@@ -586,13 +766,13 @@ export class Subject {
     if (group && this.members.length) {
       const spec = GROUP_POSES[s.groupPose];
       spec.members.forEach((m0, i) => {
-        const ms = this.onSofa && m0.pose !== 'seated' ? { ...m0, pose: 'seated' as const, x: Math.sign(m0.x) * 0.8, z: -0.02, yaw: -Math.sign(m0.x) * 6 } : m0;
+        const ms = this.onSofa && !isSeated(m0.pose) ? { ...m0, pose: 'seated' as const, x: Math.sign(m0.x) * 0.8, z: -0.02, yaw: -Math.sign(m0.x) * 6 } : m0;
         const { figure, holder } = this.members[i];
         holder.position.set(ms.x, 0, ms.z);
         holder.rotation.y = D(ms.yaw);
         holder.updateMatrixWorld(true);
         // Seat height under where this member's hips will be.
-        figure.setPose(ms.pose, ms.scale, ms.pose === 'seated' ? this.seatHeight(seat, figure) : 0.47);
+        figure.setPose(ms.pose, ms.scale, isSeated(ms.pose) ? this.seatHeight(seat, figure) : 0.47);
       });
     }
   }
@@ -621,7 +801,7 @@ export class Subject {
     }
     if (s.model === 'mannequin') {
       if (this.solo) return this.solo.eyePosition(target);
-      return target.set(0, s.pose === 'seated' ? 1.2 : 1.64, 0.05);
+      return target.set(0, isSeated(s.pose) ? 1.2 : 1.64, 0.05);
     }
     const o = this.others[s.model];
     if (!o) return target.set(0, 1.62, 0.1);

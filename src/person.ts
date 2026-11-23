@@ -6,7 +6,8 @@ import * as THREE from 'three';
 import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { loadGLTF, prepareModel } from './assets';
 import type { PoseId } from './state';
-import { Figure } from './subject';
+import { isSeated } from './state';
+import { Figure, HAND_CURL } from './subject';
 
 /** The people on hand, by file name in models/rocketbox/. */
 export type PersonId = 'female_adult_15' | 'male_adult_08' | 'female_adult_07' | 'female_child_01' | 'male_child_01';
@@ -58,6 +59,8 @@ export class Person {
   private bones = new Map<string, THREE.Bone>();
   private links: Link[] = [];
   private poseKey = '';
+  /** Finger joints, with their rest turn and how far each bends in a relaxed hand (deg). */
+  private fingers: { bone: THREE.Bone; rest: THREE.Quaternion; deg: number }[] = [];
 
   constructor(avatar: THREE.Object3D, mannequin: THREE.Object3D) {
     const model = SkeletonUtils.clone(avatar);
@@ -110,6 +113,16 @@ export class Person {
       this.links.push({ mq, rb, mqRest: rel(mq), rbRest: rel(rb), align });
     }
     for (const l of this.links) l.rb.userData.rest = l.rb.quaternion.clone();
+    // Fingers 1–4 (index to little): knuckle, middle and tip joints. The little
+    // finger curls most, as a relaxed hand does. The thumb stays at rest.
+    const RELAXED = [[11, 20, 14], [15, 22, 17], [20, 25, 18], [24, 28, 20]];
+    for (const side of ['L', 'R'])
+      RELAXED.forEach((degs, f) =>
+        ['', '1', '2'].forEach((j, i) => {
+          const bone = this.bones.get(`${side} Finger${f + 1}${j}`);
+          if (bone) this.fingers.push({ bone, rest: bone.quaternion.clone(), deg: degs[i] });
+        }),
+      );
   }
 
   private bone(name: string): THREE.Bone {
@@ -151,12 +164,16 @@ export class Person {
       l.rb.quaternion.copy(pq.invert().multiply(target));
       l.rb.updateMatrixWorld(true);
     }
+    // Fingers curl about their own z axis (toward the palm on both hands).
+    const curl = HAND_CURL[id] ?? 1;
+    const z = new THREE.Vector3(0, 0, 1);
+    for (const f of this.fingers) f.bone.quaternion.copy(f.rest).multiply(q.setFromAxisAngle(z, THREE.MathUtils.degToRad(f.deg * curl)));
     // Hips where the mannequin's hips are.
     const pelvis = this.bone('Pelvis');
     const hips = this.driver.bone('Hips').getWorldPosition(new THREE.Vector3());
     pelvis.position.copy(pelvis.parent!.worldToLocal(hips));
     this.root.updateMatrixWorld(true);
-    if (id !== 'seated') {
+    if (!isSeated(id)) {
       // Lowest toe on the floor.
       const toes = ['L Toe0', 'R Toe0'].map((n) => this.root.worldToLocal(this.bone(n).getWorldPosition(new THREE.Vector3())).y);
       this.body.position.y = 0.012 - Math.min(toes[0], toes[1]);

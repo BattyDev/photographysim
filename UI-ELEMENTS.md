@@ -114,9 +114,9 @@ The last page opened is saved in `localStorage` (`photographysim.page`) and reop
 - **Group "Shoots"**: `.button-grid.cols-3` of `.chip` buttons, with the last one picked shown `.active`. The tooltip is the shoot's blurb.
   - Outdoor solo, Outdoor family, Indoor. The app opens on Outdoor solo.
   - **People**: segmented control, Solo | Group (a family of four). Switching re-runs the current shoot for the new group size: outdoor swaps between Outdoor solo and Outdoor family; Indoor stays Indoor and moves its lights back for the group.
-  - **Pose** (solo only): `.button-grid.cols-3.small` of `.chip` buttons, with tooltips that say what each pose shows off. Picking one switches the subject to the person.
+  - **Pose** (solo only): `.button-grid.cols-3.small` of `.chip` buttons (15), with tooltips that say what each pose shows off: Relaxed, Three-quarter, Profile, Over shoulder, Chin up, Hand to chin, Hand on hip, Arms crossed, Hands clasped, Pockets, Hand in hair, Looking away, Walking, Seated, Leaning in. Picking one switches the subject to the person.
     - Standing, Three-quarter, Profile, Over shoulder, Chin up, Hand to chin, Hand on hip, Arms crossed, Seated (on an apple box).
-  - **Group pose** (group only): segmented control, Standing | Casual | Seated. Seated puts them on apple boxes in the studio, a park bench outdoors, or the sofa in the living room (the children sit too). Picking one reframes the camera.
+  - **Group pose** (group only): segmented control, Standing | Casual | Seated. Each family member takes a different pose in each layout. Seated puts them on apple boxes in the studio, a park bench outdoors, or the sofa in the living room (the children sit too). Picking one reframes the camera.
 - **Group "Lighting setups"**: `.button-grid`, 2 columns of `.chip` buttons. The tooltip on each button is a one-line description.
   - Rembrandt, Loop, Butterfly, Clamshell, Split, Rim / edge, High-key, Low-key.
 - **Group "Scenarios"**: `.button-grid`, 2 columns of `.chip` buttons.

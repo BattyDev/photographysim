@@ -68,13 +68,28 @@ export interface LightState {
   shadows: boolean;
 }
 
-export type PoseId = 'standing' | 'turned' | 'profile' | 'overshoulder' | 'chinup' | 'thinker' | 'hip' | 'crossed' | 'seated';
+export type PoseId =
+  | 'standing'
+  | 'turned'
+  | 'profile'
+  | 'overshoulder'
+  | 'chinup'
+  | 'thinker'
+  | 'hip'
+  | 'crossed'
+  | 'clasped'
+  | 'pockets'
+  | 'hair'
+  | 'lookaway'
+  | 'walking'
+  | 'seated'
+  | 'leaning';
 export type GroupPoseId = 'standing' | 'casual' | 'seated';
 export type People = 'solo' | 'group';
 
 /** Solo poses, in the order the UI lists them. Several are chosen to show lighting off. */
 export const POSE_OPTIONS: { value: PoseId; label: string; title: string }[] = [
-  { value: 'standing', label: 'Standing', title: 'Square to camera: a neutral reference' },
+  { value: 'standing', label: 'Relaxed', title: 'Weight on one leg, nearly square to camera: a natural reference' },
   { value: 'turned', label: 'Three-quarter', title: 'Body angled, face to camera: shows short vs broad lighting' },
   { value: 'profile', label: 'Profile', title: 'Side-on: try split light or a rim along the face' },
   { value: 'overshoulder', label: 'Over shoulder', title: 'Back to camera, looking back: shows off rim and hair light' },
@@ -82,8 +97,17 @@ export const POSE_OPTIONS: { value: PoseId; label: string; title: string }[] = [
   { value: 'thinker', label: 'Hand to chin', title: 'Hand near the face: watch its shadow and the light on the forearm' },
   { value: 'hip', label: 'Hand on hip', title: 'Classic fashion stance' },
   { value: 'crossed', label: 'Arms crossed', title: 'Closed, confident pose' },
-  { value: 'seated', label: 'Seated', title: 'On an apple box' },
+  { value: 'clasped', label: 'Hands clasped', title: 'Hands loosely together at the waist' },
+  { value: 'pockets', label: 'Pockets', title: 'Hands in pockets, relaxed and casual' },
+  { value: 'hair', label: 'Hand in hair', title: 'Arm raised behind the head: the arm and side catch the light' },
+  { value: 'lookaway', label: 'Looking away', title: 'Candid: face turned off to the side, eyes off the lens' },
+  { value: 'walking', label: 'Walking', title: 'Mid-stride toward the camera' },
+  { value: 'seated', label: 'Seated', title: 'On an apple box, or the sofa at home' },
+  { value: 'leaning', label: 'Leaning in', title: 'Seated, leaning forward on the knees, looking up at the lens' },
 ];
+
+/** Poses that sit on something (apple box, bench or sofa). */
+export const isSeated = (p: PoseId) => p === 'seated' || p === 'leaning';
 export type SubjectModel = 'mannequin' | 'headscan' | 'bust';
 export type LocationId =
   | 'studio_loft'
@@ -286,7 +310,7 @@ function setLights(s: SimState, lights: Partial<Record<LightId, Partial<LightSta
 
 /** Outdoor scenarios have nothing to sit on. */
 function standUp(s: SimState) {
-  if (s.subject.pose === 'seated') s.subject.pose = 'turned';
+  if (isSeated(s.subject.pose)) s.subject.pose = 'turned';
 }
 
 const HEADSHOT: CameraView = { distance: 1.45, height: 1.64, azimuth: 0, targetHeight: 1.56 };
