@@ -11,7 +11,8 @@
   --warn: #fb923c;
   --cool: #60a5fa;
   --radius: 8px;
-  --sidebar: 360px;
+  --sidebar: 424px;
+  --rail: 64px;
   color-scheme: dark;
   font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   font-size: 14px;
@@ -127,14 +128,6 @@ body {
   font-size: 12px;
 }
 
-.sidebar-scroll {
-  overflow-y: auto;
-  flex: 1;
-  padding-bottom: 40px;
-  scrollbar-width: thin;
-  scrollbar-color: #333 transparent;
-}
-
 button {
   font: inherit;
   color: inherit;
@@ -155,51 +148,89 @@ button.primary:hover {
   filter: brightness(1.08);
 }
 
-.section {
-  border-bottom: 1px solid var(--line);
-}
+/* rail + pages */
 
-.section > summary {
-  list-style: none;
+.sidebar-body {
+  flex: 1;
+  min-height: 0;
   display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 16px;
-  font-weight: 600;
-  cursor: pointer;
-  user-select: none;
 }
 
-.section > summary::-webkit-details-marker {
+.rail {
+  width: var(--rail);
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 6px;
+  border-right: 1px solid var(--line);
+  background: #121418;
+}
+
+.rail-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 8px 2px 7px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  color: var(--muted);
+  font-size: 10.5px;
+  transition: color 0.12s, background 0.12s;
+}
+
+.rail-btn:hover {
+  color: var(--text);
+  background: var(--panel-2);
+}
+
+.rail-btn.active {
+  color: var(--accent);
+  background: #221f17;
+  border-color: rgba(244, 185, 66, 0.35);
+}
+
+.rail-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.pages {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #333 transparent;
+}
+
+.page[hidden] {
   display: none;
 }
 
-.section > summary::after {
-  content: '';
-  margin-left: auto;
-  width: 7px;
-  height: 7px;
-  border-right: 1.5px solid var(--muted);
-  border-bottom: 1.5px solid var(--muted);
-  transform: rotate(-45deg);
-  transition: transform 0.15s;
+.page-header {
+  padding: 16px 16px 12px;
+  border-bottom: 1px solid var(--line);
 }
 
-.section[open] > summary::after {
-  transform: rotate(45deg);
+.page-header h2 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 650;
 }
 
-.section-icon {
-  width: 18px;
-  text-align: center;
-  color: var(--accent);
+.page-header p {
+  margin: 3px 0 0;
+  color: var(--muted);
+  font-size: 12px;
 }
 
-.section-body {
-  padding: 0 16px 14px;
+.page-body {
+  padding: 14px 16px 40px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
 
 .group {
@@ -210,10 +241,17 @@ button.primary:hover {
 
 .group-label {
   font-size: 11px;
+  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--muted);
-  margin-top: 4px;
+  letter-spacing: 0.1em;
+  color: var(--accent);
+  opacity: 0.9;
+  margin-top: 6px;
+}
+
+.page-body > .group + .group {
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
 }
 
 .group.readouts {
@@ -237,6 +275,28 @@ button.primary:hover {
 .readout-value {
   text-align: right;
   font-variant-numeric: tabular-nums;
+}
+
+.readout.hero {
+  align-items: center;
+  padding: 4px 0;
+}
+
+.readout.hero .readout-label {
+  font-size: 13px;
+  color: var(--text);
+}
+
+.readout.hero .readout-value {
+  font-size: 22px;
+  font-weight: 650;
+  color: var(--accent);
+}
+
+.readout.hero .readout-value .muted {
+  display: block;
+  font-size: 11px;
+  font-weight: 400;
 }
 
 .muted {
@@ -288,6 +348,10 @@ button.primary:hover {
   grid-template-columns: repeat(4, 1fr);
 }
 
+.button-grid.cols-5 {
+  grid-template-columns: repeat(5, 1fr);
+}
+
 .chip {
   background: var(--panel-2);
   border: 1px solid var(--line);
@@ -311,6 +375,7 @@ button.primary:hover {
 .chip.active {
   border-color: var(--accent);
   color: var(--accent);
+  background: #221f17;
 }
 
 .segmented {
@@ -358,12 +423,18 @@ button.primary:hover {
   background: var(--panel-2);
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  padding: 6px 4px 5px;
-  display: flex;
-  flex-direction: column;
+  padding: 7px 8px 6px;
+  display: grid;
+  grid-template-columns: auto 1fr;
   align-items: center;
-  gap: 2px;
-  font-size: 11.5px;
+  column-gap: 6px;
+  row-gap: 1px;
+  font-size: 12px;
+  text-align: left;
+}
+
+.light-tab .state {
+  grid-column: 2;
 }
 
 .light-tab .dot {
@@ -390,7 +461,11 @@ button.primary:hover {
 
 .light-tab.active {
   border-color: var(--accent);
-  background: #24221c;
+  background: #221f17;
+}
+
+.light-tab.active .state {
+  color: var(--accent);
 }
 
 .row-2 {
@@ -420,11 +495,12 @@ button.primary:hover {
 }
 
 .value-field {
-  width: 112px;
+  width: 120px;
   background: transparent;
   border: 1px solid transparent;
   border-radius: 5px;
-  color: var(--text);
+  color: var(--accent);
+  font-weight: 600;
   font: inherit;
   font-size: 12.5px;
   font-variant-numeric: tabular-nums;
@@ -485,6 +561,58 @@ button.primary:hover {
 
 .slider-row.disabled {
   opacity: 0.4;
+}
+
+/* Colour-temperature tracks run warm to cool instead of filling. */
+.range.kelvin::-webkit-slider-runnable-track {
+  background: linear-gradient(to right, #ff9a3c, #ffd9a8 35%, #f4f1ea 50%, #cfdcff 70%, #7fa3ff);
+  opacity: 0.85;
+}
+
+.range.kelvin::-moz-range-track {
+  background: linear-gradient(to right, #ff9a3c, #ffd9a8 35%, #f4f1ea 50%, #cfdcff 70%, #7fa3ff);
+  opacity: 0.85;
+}
+
+.range.kelvin::-webkit-slider-thumb {
+  outline: 2px solid var(--panel);
+}
+
+/* Tick labels under a slider; each one jumps to its value. */
+.ticks {
+  position: relative;
+  height: 15px;
+  margin-top: -2px;
+}
+
+.tick {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  background: none;
+  border: none;
+  padding: 0 2px;
+  font-size: 10px;
+  line-height: 15px;
+  color: #6f757e;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.tick.first {
+  transform: translateX(-7px);
+}
+
+.tick.last {
+  transform: translateX(calc(-100% + 7px));
+}
+
+.tick:hover {
+  color: var(--text);
+}
+
+.tick.on {
+  color: var(--accent);
 }
 
 /* select */
@@ -625,8 +753,44 @@ select {
   .sidebar {
     width: 100%;
     flex: 1;
+    min-height: 0;
     border-left: none;
     border-top: 1px solid var(--line);
+  }
+
+  .sidebar-header {
+    padding: 8px 12px;
+  }
+
+  .sidebar-header p,
+  .page-header p {
+    display: none;
+  }
+
+  .page-header {
+    padding: 10px 14px 8px;
+  }
+
+  .page-body {
+    padding: 12px 14px 24px;
+  }
+
+  .sidebar-body {
+    flex-direction: column-reverse;
+  }
+
+  .rail {
+    width: 100%;
+    flex-direction: row;
+    justify-content: space-around;
+    padding: 4px 4px calc(4px + env(safe-area-inset-bottom));
+    border-right: none;
+    border-top: 1px solid var(--line);
+  }
+
+  .rail-btn {
+    flex: 1;
+    padding: 5px 0 4px;
   }
 
   .diagram {
@@ -643,4 +807,217 @@ select {
 
 .credits a {
   color: var(--muted);
+}
+
+/* ------------------------------------------------------------ tutorial */
+
+.header-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+button.ghost {
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 6px 10px;
+  color: var(--text);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+button.ghost:hover {
+  border-color: #454b55;
+  background: var(--panel-2);
+}
+
+.tutorial-btn .q {
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  border: 1.5px solid var(--accent);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 700;
+  display: inline-grid;
+  place-items: center;
+}
+
+.tutorial-btn.pulse {
+  border-color: var(--accent);
+  animation: tutorial-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes tutorial-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(244, 185, 66, 0.45);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(244, 185, 66, 0);
+  }
+}
+
+.tour {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  pointer-events: none;
+}
+
+.tour[hidden] {
+  display: none;
+}
+
+/* The cut-out: everything outside it is dimmed, nothing blocks the pointer. */
+.tour-spot {
+  position: absolute;
+  border-radius: 10px;
+  box-shadow: 0 0 0 9999px rgba(5, 6, 8, 0.62);
+  outline: 2px solid var(--accent);
+  outline-offset: 0;
+  transition: left 0.25s, top 0.25s, width 0.25s, height 0.25s;
+}
+
+.tour-spot.none {
+  outline: none;
+}
+
+.tour-card {
+  position: absolute;
+  width: 340px;
+  max-width: calc(100vw - 16px);
+  background: var(--panel);
+  border: 1px solid #3a3f48;
+  border-radius: 12px;
+  padding: 12px 16px 14px;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.55);
+  pointer-events: auto;
+  transition: left 0.25s, top 0.25s;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.tour-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.tour-count {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.tour-close {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 20px;
+  line-height: 1;
+  padding: 0 2px;
+}
+
+.tour-close:hover {
+  color: var(--text);
+}
+
+.tour-card h3 {
+  margin: 4px 0 6px;
+  font-size: 16px;
+  font-weight: 650;
+}
+
+.tour-body p {
+  margin: 0 0 8px;
+  color: #cfccc6;
+}
+
+.tour-body ul {
+  margin: 0 0 8px;
+  padding-left: 18px;
+  color: #cfccc6;
+}
+
+.tour-body strong {
+  color: var(--text);
+}
+
+.tour-body kbd {
+  font: inherit;
+  font-size: 11px;
+  border: 1px solid var(--line);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  padding: 0 5px;
+  background: var(--panel-2);
+}
+
+.tour-try {
+  background: #221f17;
+  border-left: 3px solid var(--accent);
+  border-radius: 4px;
+  padding: 6px 9px;
+}
+
+.tour-bar {
+  height: 3px;
+  background: #2c3038;
+  border-radius: 2px;
+  margin: 10px 0 12px;
+  overflow: hidden;
+}
+
+.tour-bar span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.25s;
+}
+
+.tour-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.tour-back {
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 6px 14px;
+}
+
+.tour-back:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.tour-next {
+  min-width: 96px;
+}
+
+@media (max-width: 820px) {
+  .tutorial-btn .txt {
+    display: none;
+  }
+
+  .tutorial-btn {
+    padding: 6px 8px;
+  }
+
+  .tour-card {
+    font-size: 12.5px;
+    padding: 10px 14px 12px;
+  }
+
+  .tour-body p,
+  .tour-body ul {
+    margin-bottom: 6px;
+  }
 }

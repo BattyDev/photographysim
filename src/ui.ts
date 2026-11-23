@@ -2,6 +2,15 @@
 
 type Refresh = () => void;
 
+/** A slider tick: a value, or a value with its own label. */
+export type Tick = number | [number, string];
+
+export interface Pages {
+  /** Add a page and its rail button; returns the page body to fill. */
+  add(id: string, title: string, subtitle: string, icon: string): HTMLElement;
+  show(id: string): void;
+}
+
 export class Panel {
   private refreshers: Refresh[] = [];
 
@@ -27,16 +36,58 @@ export class Panel {
     return e;
   }
 
-  section(parent: HTMLElement, title: string, open = true, icon = ''): HTMLElement {
-    const det = this.el('details', 'section');
-    det.open = open;
-    const sum = this.el('summary');
-    sum.innerHTML = `<span class="section-icon">${icon}</span><span>${title}</span>`;
-    det.appendChild(sum);
-    const body = this.el('div', 'section-body');
-    det.appendChild(body);
-    parent.appendChild(det);
-    return body;
+  /**
+   * Sidebar pages with an icon rail: one page shows at a time. The last page
+   * opened is remembered between visits.
+   */
+  pages(parent: HTMLElement): Pages {
+    const rail = this.el('nav', 'rail');
+    const stack = this.el('div', 'pages');
+    parent.append(rail, stack);
+    const items = new Map<string, { btn: HTMLButtonElement; page: HTMLElement }>();
+    const KEY = 'photographysim.page';
+    let saved: string | null = null;
+    try {
+      saved = localStorage.getItem(KEY);
+    } catch {
+      /* storage blocked */
+    }
+    const show = (id: string) => {
+      if (!items.has(id)) return;
+      for (const [k, it] of items) {
+        it.btn.classList.toggle('active', k === id);
+        it.btn.setAttribute('aria-selected', String(k === id));
+        it.page.hidden = k !== id;
+      }
+      stack.scrollTop = 0;
+      try {
+        localStorage.setItem(KEY, id);
+      } catch {
+        /* storage blocked */
+      }
+    };
+    rail.setAttribute('role', 'tablist');
+    return {
+      add: (id, title, subtitle, icon) => {
+        const btn = this.el('button', 'rail-btn');
+        btn.setAttribute('role', 'tab');
+        btn.title = title;
+        btn.innerHTML = `${icon}<span>${title}</span>`;
+        btn.addEventListener('click', () => show(id));
+        rail.appendChild(btn);
+        const page = this.el('section', 'page');
+        page.innerHTML = `<header class="page-header"><h2>${title}</h2><p>${subtitle}</p></header>`;
+        const body = this.el('div', 'page-body');
+        page.appendChild(body);
+        stack.appendChild(page);
+        items.set(id, { btn, page });
+        // First page by default, or the one open last visit once it exists.
+        if (items.size === 1 || saved === id) show(id);
+        else page.hidden = true;
+        return body;
+      },
+      show,
+    };
   }
 
   group(parent: HTMLElement, label?: string, cls = ''): HTMLElement {
@@ -86,6 +137,12 @@ export class Panel {
       parse?: (s: string) => number | null;
       hint?: string;
       disabled?: () => boolean;
+      /** Labelled marks under the track; click one to jump to it. Labels default to `format`. */
+      ticks?: Tick[];
+      /** Logarithmic track, so equal steps are equal ratios (each doubling of distance = 2 stops). */
+      log?: boolean;
+      /** Warm-to-cool track for colour temperature. */
+      kelvin?: boolean;
     },
   ): HTMLElement {
     const row = this.el('div', 'control slider-row');
@@ -95,20 +152,27 @@ export class Panel {
     field.type = 'text';
     field.spellcheck = false;
     top.append(label, field);
-    const range = this.el('input', 'range');
+    const range = this.el('input', `range${opts.kelvin ? ' kelvin' : ''}`);
     range.type = 'range';
     const steps = opts.steps;
+    const min = opts.min ?? 0;
+    const max = opts.max ?? 1;
+    const step = opts.step ?? 0.01;
+    const LOG_RES = 1000;
     if (steps) {
       range.min = '0';
       range.max = String(steps.length - 1);
       range.step = '1';
+    } else if (opts.log) {
+      range.min = '0';
+      range.max = String(LOG_RES);
+      range.step = '1';
     } else {
-      range.min = String(opts.min ?? 0);
-      range.max = String(opts.max ?? 1);
-      range.step = String(opts.step ?? 0.01);
+      range.min = String(min);
+      range.max = String(max);
+      range.step = String(step);
     }
     row.append(top, range);
-    if (opts.hint) row.appendChild(this.el('div', 'hint', opts.hint));
     parent.appendChild(row);
 
     const fmt = opts.format ?? ((v: number) => String(Math.round(v * 100) / 100));
@@ -118,31 +182,65 @@ export class Panel {
       for (let i = 0; i < steps.length; i++) if (Math.abs(steps[i] - v) < Math.abs(steps[best] - v)) best = i;
       return best;
     };
+    const clamp = (v: number) => Math.min(max, Math.max(min, v));
+    // Track position <-> value.
+    const toPos = (v: number) => (steps ? toIndex(v) : opts.log ? (LOG_RES * Math.log(clamp(v) / min)) / Math.log(max / min) : v);
+    const fromPos = (p: number) => {
+      if (steps) return steps[Math.round(p)];
+      if (opts.log) return clamp(Math.round((min * Math.pow(max / min, p / LOG_RES)) / step) * step);
+      return p;
+    };
+    const lo = Number(range.min);
+    const hi = Number(range.max);
+    const frac = (v: number) => (toPos(v) - lo) / (hi - lo || 1);
+
+    let tickEls: { el: HTMLElement; f: number }[] = [];
+    if (opts.ticks?.length) {
+      const bar = this.el('div', 'ticks');
+      tickEls = opts.ticks.map((t) => {
+        const [v, label] = Array.isArray(t) ? t : [t, fmt(t)];
+        const b = this.el('button', 'tick', label);
+        b.type = 'button';
+        b.tabIndex = -1;
+        const f = frac(v);
+        b.style.left = `calc(7px + ${f.toFixed(4)} * (100% - 14px))`;
+        // Keep end labels inside the row.
+        if (f < 0.04) b.classList.add('first');
+        else if (f > 0.96) b.classList.add('last');
+        b.addEventListener('click', () => {
+          if (opts.disabled?.()) return;
+          opts.set(steps ? steps[toIndex(v)] : v);
+          paint();
+          this.changed();
+        });
+        bar.appendChild(b);
+        return { el: b, f };
+      });
+      row.appendChild(bar);
+    }
+    if (opts.hint) row.appendChild(this.el('div', 'hint', opts.hint));
+
     const paint = () => {
       const v = opts.get();
-      range.value = String(steps ? toIndex(v) : v);
+      range.value = String(toPos(v));
       if (document.activeElement !== field) field.value = fmt(v);
-      const lo = Number(range.min);
-      const hi = Number(range.max);
-      range.style.setProperty('--fill', `${((Number(range.value) - lo) / (hi - lo || 1)) * 100}%`);
+      const f = (Number(range.value) - lo) / (hi - lo || 1);
+      range.style.setProperty('--fill', `${f * 100}%`);
+      for (const t of tickEls) t.el.classList.toggle('on', Math.abs(t.f - f) < 0.012);
       const dis = opts.disabled?.() ?? false;
       range.disabled = dis;
       field.disabled = dis;
       row.classList.toggle('disabled', dis);
     };
     range.addEventListener('input', () => {
-      const raw = Number(range.value);
-      opts.set(steps ? steps[raw] : raw);
+      opts.set(fromPos(Number(range.value)));
       paint();
       this.changed();
     });
     const commit = () => {
       const parsed = opts.parse ? opts.parse(field.value) : parseFloat(field.value.replace(/[^\d.\-]/g, ''));
       if (parsed !== null && isFinite(parsed)) {
-        let v = parsed;
-        if (steps) v = steps[toIndex(v)];
-        else v = Math.min(Number(range.max), Math.max(Number(range.min), v));
-        opts.set(v);
+        opts.set(steps ? steps[toIndex(parsed)] : clamp(parsed));
         this.changed();
       }
       field.blur();

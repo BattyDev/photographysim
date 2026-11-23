@@ -24,5 +24,6 @@ All third-party assets in `public/assets/`. Everything is CC0 (public domain) ex
 | Venice Sunset HDRI | [Poly Haven](https://polyhaven.com/a/venice_sunset) | `hdri/venice_sunset_2k.hdr` |
 | Tiergarten HDRI | [Poly Haven](https://polyhaven.com/a/tiergarten) | `hdri/tiergarten_2k.hdr` |
 | Rooftop Night HDRI | [Poly Haven](https://polyhaven.com/a/rooftop_night) | `hdri/rooftop_night_2k.hdr` |
+| Detail layers for all six HDRIs | Poly Haven's full-size tonemapped JPGs of the same panoramas, re-encoded at 8192×4096 (q80) and 4096×2048 (q84) | `hdri/detail/<location>_8k.jpg`, `hdri/detail/<location>_4k.jpg` |
 | Furniture Kit: chair | [Kenney](https://kenney.nl/assets/furniture-kit) | `models/kenney/chair.glb` |
 | Nature Kit: trees and bushes | [Kenney](https://kenney.nl/assets/nature-kit) | `models/kenney/tree_*.glb`, `models/kenney/plant_bush*.glb` |

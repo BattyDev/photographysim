@@ -45,14 +45,23 @@ Built with Three.js + Vite + TypeScript. See [PLAN.md](PLAN.md) for the design b
     clear / hazy / overcast / open shade, haze, twilight and night. Kenney
     trees and hedges.
   - **Location**: six real HDRI panoramas (studio loft, artist workshop,
-    meadow, Venice sunset, park, city rooftop at night). Each is projected onto
-    the ground and calibrated to real lux, and its sun is extracted into a
-    shadow-casting light that you can rotate around the subject.
+    meadow, Venice sunset, park, city rooftop at night), calibrated to real lux.
+    Each sun is extracted into a shadow-casting light you can rotate around the
+    subject. The panorama is projected from where it was shot onto real
+    surfaces at real distances: a ground disc and far dome outdoors, and the
+    measured room (floor, walls, ceiling) indoors. Those surfaces are
+    relightable: flash brightens the floor and nearby walls by exactly what it
+    adds, they catch every light's shadow, and depth of field blurs them by
+    their true distance. A sharp 8k photo (4k on phones) adds fine detail on
+    top of the 2k HDR, loaded only for the location on screen.
 - **Quick starts**: 8 lighting setups (Rembrandt, loop, butterfly, clamshell,
   split, rim, high-key, low-key) and 8 scenarios (studio, window light, golden
   hour, overcast, midday + fill flash, open shade, blue hour + strobe, night bokeh).
 - Top-view setup diagram (drag lights), click lights in 3D to move them with a
   gizmo, and **Save photo** to download a PNG.
+- **Tutorial**: a 22-step guided tour from the header that opens each page,
+  highlights each control and explains it. Controls stay usable while
+  highlighted, and many steps suggest something to try.
 
 ## Assets
 
@@ -94,9 +103,11 @@ Pushing to `main` deploys to GitHub Pages via `.github/workflows/pages.yml`.
 | `src/lights.ts` | Studio light rigs and per-light illuminance |
 | `src/softlight.ts` | Shader patch: area-light wrap, wider specular, soft PCF shadows |
 | `src/world.ts` | Studio cyc, open-sky sun model, location mode, props |
-| `src/hdri.ts` | HDRI locations: sun extraction, lux calibration, metering grid |
+| `src/hdri.ts` | HDRI locations: sun extraction, lux calibration, metering grid, room measurements |
+| `src/projection.ts` | Panorama projected onto relightable proxy surfaces, with the sharp detail layer |
 | `src/subject.ts` | Mannequin bone poses, family group poses and seats, head scan, bust |
 | `src/assets.ts` | glTF / texture / HDR loading helpers |
 | `src/pipeline.ts` | HDR render → thin-lens bokeh → white balance → tone map |
 | `src/diagram.ts` | Top-down lighting diagram |
 | `src/ui.ts` | Small DOM control kit |
+| `src/tour.ts`, `src/tutorial.ts` | Guided tour overlay and its steps |

@@ -101,7 +101,8 @@ const SHADOW_PARS = patchShadowPars(THREE.ShaderChunk.shadowmap_pars_fragment);
 const PHYSICAL = HEADER + patchPhysical(THREE.ShaderChunk.lights_physical_pars_fragment);
 const BEGIN = patchBegin(THREE.ShaderChunk.lights_fragment_begin);
 
-function onBeforeCompile(shader: THREE.WebGLProgramParametersWithUniforms) {
+/** The soft-light shader patch, for materials that add their own patches on top. */
+export function softOnBeforeCompile(shader: THREE.WebGLProgramParametersWithUniforms) {
   shader.uniforms.spotWrap = softUniforms.spotWrap;
   shader.uniforms.dirWrap = softUniforms.dirWrap;
   shader.uniforms.spotSoft = softUniforms.spotSoft;
@@ -120,7 +121,7 @@ export function patchSoftLighting(root: THREE.Object3D) {
     for (const m of mats) {
       if (!(m as THREE.MeshStandardMaterial).isMeshStandardMaterial || m.userData.soft) continue;
       m.userData.soft = true;
-      m.onBeforeCompile = onBeforeCompile;
+      m.onBeforeCompile = softOnBeforeCompile;
       m.needsUpdate = true;
     }
   });

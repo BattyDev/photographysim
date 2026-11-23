@@ -7,8 +7,8 @@
 //     illuminance matches the location's target lux,
 //   • a coarse grid is kept so the light meter can integrate it for any normal.
 import * as THREE from 'three';
-import { GroundedSkybox } from 'three/examples/jsm/objects/GroundedSkybox.js';
-import { loadHDR } from './assets';
+import { loadHDR, loadTexture } from './assets';
+import { ProjectedLocation, type ProxyShape } from './projection';
 import type { LocationId } from './state';
 
 export interface LocationSpec {
@@ -19,21 +19,23 @@ export interface LocationSpec {
   lux: number;
   /** Cut out the sun and replace it with a directional light. */
   sun: boolean;
-  /** Height of the panorama's camera above the ground (m), for the grounded projection. */
+  /** Height of the panorama's camera above the ground (m). */
   height: number;
-  radius: number;
+  /** Surfaces the panorama is projected onto: open ground and a far dome, or the room it was shot in. */
+  proxy: ProxyShape;
   /** Rough colour temperature of the light, for the white-balance hint. */
   kelvin: number;
   blurb: string;
 }
 
 export const LOCATIONS: LocationSpec[] = [
-  { id: 'studio_loft', label: 'Photo studio loft', file: 'photo_studio_loft_hall_2k.hdr', lux: 250, sun: false, height: 1.6, radius: 18, kelvin: 4800, blurb: 'Bright studio hall with big windows: soft, mixed ambient.' },
-  { id: 'workshop', label: 'Artist workshop', file: 'artist_workshop_2k.hdr', lux: 600, sun: false, height: 1.5, radius: 12, kelvin: 5800, blurb: 'Interior lit by windows: classic soft, directional window light.' },
-  { id: 'meadow', label: 'Meadow, midday', file: 'meadow_2_2k.hdr', lux: 60000, sun: true, height: 1.6, radius: 80, kelvin: 5600, blurb: 'Hard high sun and a blue sky: the toughest light for portraits.' },
-  { id: 'sunset', label: 'Venice, sunset', file: 'venice_sunset_2k.hdr', lux: 1500, sun: true, height: 1.6, radius: 60, kelvin: 3200, blurb: 'Low warm sun skimming the water: golden-hour colour and long shadows.' },
-  { id: 'park_overcast', label: 'Tiergarten park', file: 'tiergarten_2k.hdr', lux: 12000, sun: false, height: 1.6, radius: 60, kelvin: 6500, blurb: 'Park under soft sky: gentle, even, flattering light.' },
-  { id: 'rooftop_night', label: 'City rooftop, night', file: 'rooftop_night_2k.hdr', lux: 12, sun: false, height: 1.7, radius: 40, kelvin: 3400, blurb: 'Dim city glow: bring your own light, and let the lights become bokeh.' },
+  // Rooms measured from where the floor and ceiling meet the walls in each panorama.
+  { id: 'studio_loft', label: 'Photo studio loft', file: 'photo_studio_loft_hall_2k.hdr', lux: 250, sun: false, height: 1.6, proxy: { kind: 'room', x: [-2.3, 2.2], z: [-3.03, 2.52], ceiling: 3.48, yaw: 15 }, kelvin: 4800, blurb: 'Bright studio hall with big windows: soft, mixed ambient.' },
+  { id: 'workshop', label: 'Artist workshop', file: 'artist_workshop_2k.hdr', lux: 600, sun: false, height: 1.5, proxy: { kind: 'room', x: [-3.21, 1.9], z: [-3.59, 3.46], ceiling: 3.4, yaw: -30 }, kelvin: 5800, blurb: 'Interior lit by windows: classic soft, directional window light.' },
+  { id: 'meadow', label: 'Meadow, midday', file: 'meadow_2_2k.hdr', lux: 60000, sun: true, height: 1.6, proxy: { kind: 'open', radius: 80 }, kelvin: 5600, blurb: 'Hard high sun and a blue sky: the toughest light for portraits.' },
+  { id: 'sunset', label: 'Venice, sunset', file: 'venice_sunset_2k.hdr', lux: 1500, sun: true, height: 1.6, proxy: { kind: 'open', radius: 60 }, kelvin: 3200, blurb: 'Low warm sun skimming the water: golden-hour colour and long shadows.' },
+  { id: 'park_overcast', label: 'Tiergarten park', file: 'tiergarten_2k.hdr', lux: 12000, sun: false, height: 1.6, proxy: { kind: 'open', radius: 60 }, kelvin: 6500, blurb: 'Park under soft sky: gentle, even, flattering light.' },
+  { id: 'rooftop_night', label: 'City rooftop, night', file: 'rooftop_night_2k.hdr', lux: 12, sun: false, height: 1.7, proxy: { kind: 'open', radius: 40 }, kelvin: 3400, blurb: 'Dim city glow: bring your own light, and let the lights become bokeh.' },
 ];
 
 export const locationSpec = (id: LocationId) => LOCATIONS.find((l) => l.id === id)!;
@@ -46,7 +48,8 @@ export interface HdriData {
   /** Panorama with the sun removed, scaled to cd/m². */
   texture: THREE.DataTexture;
   envMap: THREE.Texture;
-  skybox: GroundedSkybox;
+  /** The panorama on relightable surfaces at real distances. */
+  place: ProjectedLocation;
   /** Sun direction in panorama space (unit), or null. */
   sunDir: THREE.Vector3 | null;
   /** Sun illuminance on a surface facing it (lux) and its linear colour (luminance 1). */
@@ -170,6 +173,27 @@ function analyse(tex: THREE.DataTexture, spec: LocationSpec) {
   return { sunDir, sunE, sunColor, grid, brightAz };
 }
 
+/**
+ * GPU copy in 16-bit half floats. The analysis needs full floats, but many
+ * phones (iPhones in particular) can't filter 32-bit float textures: sampling
+ * returns black, so the environment light vanishes and subjects render dark.
+ * Half floats filter everywhere WebGL2 runs. Values are clamped below the
+ * half-float maximum (the sun has already been cut out).
+ */
+function toHalfFloat(src: THREE.DataTexture): THREE.DataTexture {
+  const { width, height } = src.image as { width: number; height: number };
+  const f = src.image.data as Float32Array;
+  const h = new Uint16Array(f.length);
+  for (let i = 0; i < f.length; i++) h[i] = THREE.DataUtils.toHalfFloat(Math.min(f[i], 65000));
+  const tex = new THREE.DataTexture(h, width, height, THREE.RGBAFormat, THREE.HalfFloatType);
+  tex.flipY = src.flipY;
+  tex.minFilter = THREE.LinearFilter;
+  tex.magFilter = THREE.LinearFilter;
+  tex.generateMipmaps = false;
+  tex.needsUpdate = true;
+  return tex;
+}
+
 export class HdriLibrary {
   private cache = new Map<LocationId, Promise<HdriData>>();
   private ready = new Map<LocationId, HdriData>();
@@ -187,23 +211,46 @@ export class HdriLibrary {
     let p = this.cache.get(id);
     if (p) return p;
     const spec = locationSpec(id);
-    p = loadHDR(`hdri/${spec.file}`).then((tex) => {
-      const a = analyse(tex, spec);
+    p = loadHDR(`hdri/${spec.file}`).then((src) => {
+      const a = analyse(src, spec);
+      const tex = toHalfFloat(src);
       tex.mapping = THREE.EquirectangularReflectionMapping;
       tex.colorSpace = THREE.LinearSRGBColorSpace;
       const envMap = this.pmrem.fromEquirectangular(tex).texture;
-      const skybox = new GroundedSkybox(tex, spec.height, spec.radius);
-      skybox.position.y = spec.height - 0.01;
-      // Write depth so the ground near the subject is blurred by its real distance.
-      skybox.material.depthWrite = true;
-      skybox.renderOrder = -10;
       const { brightAz, ...rest } = a;
-      const data: HdriData = { spec, texture: tex, envMap, skybox, sunAzimuth: brightAz, ...rest };
+      // Light each surface received when the photo was taken (panorama space).
+      const irradiance = (n: THREE.Vector3) => {
+        let e = 0;
+        for (const g of a.grid) e += g.e * Math.max(0, g.dir.dot(n));
+        if (a.sunDir) e += a.sunE * Math.max(0, a.sunDir.dot(n));
+        return e;
+      };
+      const place = new ProjectedLocation(tex, spec.height, spec.proxy, irradiance);
+      const data: HdriData = { spec, texture: tex, envMap, place, sunAzimuth: brightAz, ...rest };
       this.ready.set(id, data);
       return data;
     });
     this.cache.set(id, p);
     return p;
+  }
+
+  /**
+   * Sharp photo of the panorama for fine detail: 8k where the GPU and screen
+   * can use it, 4k on phones. Loaded only once the location is in view.
+   */
+  async loadDetail(id: LocationId, renderer: THREE.WebGLRenderer): Promise<void> {
+    const data = await this.load(id);
+    const coarse = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
+    const big = renderer.capabilities.maxTextureSize >= 8192 && !coarse;
+    const tex = await loadTexture(`hdri/detail/${id}_${big ? '8k' : '4k'}.jpg`, true);
+    tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+    tex.wrapS = THREE.RepeatWrapping;
+    data.place.setDetail(tex);
+  }
+
+  /** Free a location's sharp layer: an 8k photo holds ~170 MB of GPU memory. */
+  dropDetail(id: LocationId) {
+    this.ready.get(id)?.place.setDetail(null);
   }
 
   /**

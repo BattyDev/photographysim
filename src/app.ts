@@ -46,7 +46,9 @@ import {
 } from './state';
 import { LOCATIONS, locationSpec } from './hdri';
 import { GROUP_POSES, Subject } from './subject';
-import { Panel } from './ui';
+import { Panel, type Pages } from './ui';
+import { Tour } from './tour';
+import { TUTORIAL } from './tutorial';
 import { World, daylight, sunElevation, type Exposure } from './world';
 
 const D = THREE.MathUtils.degToRad;
@@ -60,6 +62,30 @@ interface Metering {
   ambientH: number;
   backgroundH: number | null;
 }
+
+/** Rail icons: 24px line drawings in the current text colour. */
+const svg = (d: string) =>
+  `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+const ICONS = {
+  shoot: svg('<path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8L3.5 9.7l5.9-.9z"/>'),
+  lights: svg('<path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.6 10.8c.6.5 1 1.2 1 2V16h5.2v-.2c0-.8.4-1.5 1-2A6 6 0 0 0 12 3z"/>'),
+  camera: svg('<path d="M4 8h3l1.6-2.5h6.8L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.6"/>'),
+  subject: svg('<circle cx="12" cy="7.5" r="3.5"/><path d="M5 20.5c.6-4 3.4-6.5 7-6.5s6.4 2.5 7 6.5"/>'),
+  scene: svg('<path d="M3 19l6-8 4 5 3-3.5 5 6.5z"/><circle cx="16.5" cy="6.5" r="2"/>'),
+  view: svg('<path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/>'),
+};
+
+/** Short light names that fit the four tabs. */
+const TAB_NAMES: Record<LightId, string> = { key: 'Key', fill: 'Fill', rim: 'Rim', bg: 'Back' };
+
+/** Camera white balance presets, warm to cool. */
+const WB_PRESETS = [
+  { label: 'Tungsten', k: 3200 },
+  { label: 'Fluoro', k: 4000 },
+  { label: 'Daylight', k: 5600 },
+  { label: 'Cloudy', k: 6500 },
+  { label: 'Shade', k: 7500 },
+];
 
 export class App {
   state: SimState = defaultState();
@@ -85,6 +111,11 @@ export class App {
   /** The focus shoot last loaded, so Solo ⇄ Group can re-run it. */
   private currentShoot: Preset | null = null;
   private viewport: HTMLElement;
+  private nav!: Pages;
+  private tour!: Tour;
+  /** Last framing and camera height picked, highlighted until the user orbits away. */
+  private framing: string | null = null;
+  private angle: string | null = null;
   private toast: HTMLElement;
 
   constructor(root: HTMLElement) {
@@ -113,6 +144,11 @@ export class App {
     this.orbit.maxDistance = 14;
     this.orbit.maxPolarAngle = D(100);
     this.orbit.addEventListener('change', () => this.interact());
+    this.orbit.addEventListener('start', () => {
+      if (this.framing === null && this.angle === null) return;
+      this.framing = this.angle = null;
+      this.panel.refresh();
+    });
 
     this.pipeline = new Pipeline(this.renderer);
     this.world = new World(this.scene, this.renderer, () => this.update());
@@ -271,6 +307,7 @@ export class App {
   // -------------------------------------------------------------- camera
 
   private applyView(v: CameraView) {
+    this.framing = this.angle = null;
     const az = D(v.azimuth);
     this.orbit.target.set(0, v.targetHeight, 0);
     this.camera.position.set(Math.sin(az) * v.distance, v.height, Math.cos(az) * v.distance);
@@ -329,6 +366,7 @@ export class App {
       if (hit) {
         this.state.selectedLight = hit.object.userData.lightId as LightId;
         this.gizmoActive = true;
+        this.nav.show('lights');
         this.toastMsg(`${this.sel.name} light selected — drag the arrows to move it`);
       } else {
         this.gizmoActive = false;
@@ -492,18 +530,30 @@ export class App {
     const header = P.el('header', 'sidebar-header');
     header.innerHTML = `<div><h1>Lighting Simulator</h1><p>Light, lens and location — see how they interact.</p></div>`;
     const actions = P.el('div', 'header-actions');
+    const help = P.el('button', 'ghost tutorial-btn');
+    help.title = 'Tutorial: a guided tour of every control';
+    help.innerHTML = '<span class="q" aria-hidden="true">?</span><span class="txt">Tutorial</span>';
+    // Pulse until it has been opened once.
+    if (Tour.unseen) help.classList.add('pulse');
+    help.addEventListener('click', () => {
+      help.classList.remove('pulse');
+      this.tour.start();
+    });
     const save = P.el('button', 'primary', 'Save photo');
     save.addEventListener('click', () => this.savePhoto());
-    actions.appendChild(save);
+    actions.append(help, save);
     header.appendChild(actions);
     root.appendChild(header);
 
-    const scroll = P.el('div', 'sidebar-scroll');
-    root.appendChild(scroll);
+    const body = P.el('div', 'sidebar-body');
+    root.appendChild(body);
+    this.nav = P.pages(body);
+    this.tour = new Tour(TUTORIAL, (id) => this.nav.show(id));
+    const page = (id: keyof typeof ICONS, title: string, subtitle: string) => this.nav.add(id, title, subtitle, ICONS[id]);
 
     // Quick starts
     {
-      const sec = P.section(scroll, 'Quick starts', true, '★');
+      const sec = page('shoot', 'Shoots', 'Ready-made shoots, poses and classic lighting setups.');
       const g0 = P.group(sec, 'Shoots');
       P.buttons(
         g0,
@@ -551,18 +601,19 @@ export class App {
       const note = P.el('div', 'preset-note');
       sec.appendChild(note);
       P.track(() => {
-        note.innerHTML = this.presetNote || 'Pick a setup to load it, then tweak anything below.';
+        note.innerHTML = this.presetNote || 'Pick a shoot or a setup to load it, then tweak anything in the other pages.';
       });
     }
 
     // Lights
     {
-      const sec = P.section(scroll, 'Lights', true, '💡');
+      const sec = page('lights', 'Lights', 'Up to four lights: place them, shape them, colour them.');
       const tabs = P.el('div', 'light-tabs');
       sec.appendChild(tabs);
       const tabEls = this.state.lights.map((l) => {
         const t = P.el('button', 'light-tab');
-        t.innerHTML = `<span class="dot" style="background:${l.color}"></span><span class="name">${l.name}</span><span class="state"></span>`;
+        t.innerHTML = `<span class="dot" style="background:${l.color}"></span><span class="name">${TAB_NAMES[l.id]}</span><span class="state"></span>`;
+        t.title = l.name;
         t.addEventListener('click', () => {
           this.state.selectedLight = l.id;
           this.update();
@@ -575,7 +626,7 @@ export class App {
           const l = s().lights[i];
           t.classList.toggle('active', s().selectedLight === l.id);
           t.classList.toggle('off', !l.enabled);
-          (t.querySelector('.state') as HTMLElement).textContent = !l.enabled ? 'off' : l.solo ? 'solo' : formatPower(l.power);
+          (t.querySelector('.state') as HTMLElement).textContent = !l.enabled ? 'off' : l.solo ? 'solo' : formatPower(l.power).replace(' +0.3', ' +⅓').replace(' +0.7', ' +⅔');
         });
       });
 
@@ -611,6 +662,7 @@ export class App {
         get: () => this.sel.power,
         set: (v) => (this.sel.power = v),
         format: formatPower,
+        ticks: [[-7, '1/128'], [-5, '1/32'], [-3, '1/8'], [-1, '1/2'], [0, '1/1']],
         parse: (t) => {
           const m = t.match(/1\s*\/\s*(\d+)/);
           return m ? -Math.log2(parseFloat(m[1])) : null;
@@ -665,6 +717,7 @@ export class App {
         get: () => this.sel.azimuth,
         set: (v) => (this.sel.azimuth = v),
         format: (v) => (Math.abs(v) < 1 ? 'front' : Math.abs(v) > 179 ? 'behind' : `${Math.abs(Math.round(v))}° ${v < 0 ? 'cam-left' : 'cam-right'}`),
+        ticks: [[-180, 'behind'], [-90, 'left'], [0, 'front'], [90, 'right'], [180, 'behind']],
         parse: (t) => {
           const n = parseFloat(t);
           return isFinite(n) ? (/l/i.test(t) ? -Math.abs(n) : n) : null;
@@ -678,16 +731,19 @@ export class App {
         get: () => this.sel.elevation,
         set: (v) => (this.sel.elevation = v),
         format: (v) => `${Math.round(v)}° ${v >= 0 ? 'above' : 'below'} eyes`,
+        ticks: [[-45, '−45°'], [0, 'eye level'], [45, '45°'], [85, 'overhead']],
       });
       P.slider(pos, {
         label: 'Distance',
         min: 0.4,
         max: 6,
         step: 0.05,
+        log: true,
         get: () => this.sel.distance,
         set: (v) => (this.sel.distance = v),
         format: (v) => `${v.toFixed(2)} m`,
-        hint: 'Inverse square law: double the distance → ¼ the light (−2 stops).',
+        ticks: [[0.5, '0.5 m'], [1, '1 m'], [2, '2 m'], [4, '4 m']],
+        hint: 'Inverse square law: each mark is double the distance, which is ¼ the light (−2 stops).',
       });
       P.segmented(pos, {
         label: 'Aim at',
@@ -709,6 +765,8 @@ export class App {
         get: () => this.sel.kelvin,
         set: (v) => (this.sel.kelvin = v),
         format: (v) => `${Math.round(v)} K`,
+        kelvin: true,
+        ticks: [[3200, '3200 tungsten'], [5600, '5600 flash'], [8000, '8000']],
       });
       P.color(col, {
         label: 'Gel',
@@ -727,7 +785,7 @@ export class App {
         if (f <= 0) return '<span class="muted">no fill</span>';
         const stops = Math.log2((k + f) / f);
         return `${stopsToRatio(stops)} <span class="muted">(${stops.toFixed(1)} stops)</span>`;
-      });
+      }, 'hero');
       const bgRead = P.readout(ratios, 'Background vs face', () => {
         const m = this.metering;
         if (!m || m.backgroundH === null) return '';
@@ -739,15 +797,41 @@ export class App {
 
     // Camera
     {
-      const sec = P.section(scroll, 'Camera', true, '◉');
+      const sec = page('camera', 'Camera', 'Lens, focus, exposure and white balance.');
       const fr = P.group(sec, 'Framing');
-      P.buttons(fr, [
-        ...FRAMINGS.map((f) => ({ label: f.label, onClick: () => this.frame(f.view) })),
-        { label: 'Eye level', onClick: () => this.cameraHeight('eye') },
-        { label: 'High angle', onClick: () => this.cameraHeight('high') },
-        { label: 'Low angle', onClick: () => this.cameraHeight('low') },
-      ], 'cols-3');
-      P.slider(sec, {
+      P.buttons(
+        fr,
+        FRAMINGS.map((f) => ({
+          label: f.label,
+          onClick: () => {
+            this.frame(f.view);
+            this.framing = f.label;
+          },
+          active: () => this.framing === f.label,
+        })),
+        'cols-3',
+      );
+      const heights = [
+        { id: 'eye', label: 'Eye level', title: 'Camera level with the eyes: neutral' },
+        { id: 'high', label: 'High angle', title: 'Looking down: slims the jaw, shows the top light' },
+        { id: 'low', label: 'Low angle', title: 'Looking up: makes the subject loom larger' },
+      ] as const;
+      const ang = P.group(sec, 'Camera height');
+      P.buttons(
+        ang,
+        heights.map((h) => ({
+          label: h.label,
+          title: h.title,
+          onClick: () => {
+            this.cameraHeight(h.id);
+            this.angle = h.id;
+          },
+          active: () => this.angle === h.id,
+        })),
+        'cols-3',
+      );
+      const lens = P.group(sec, 'Lens');
+      P.slider(lens, {
         label: 'Focal length',
         min: 14,
         max: 200,
@@ -755,22 +839,27 @@ export class App {
         get: () => s().camera.focalLength,
         set: (v) => (s().camera.focalLength = v),
         format: (v) => `${Math.round(v)} mm`,
+        ticks: [[24, '24'], [50, '50'], [85, '85'], [135, '135'], [200, '200 mm']],
         hint: 'Longer lenses compress the background and flatter faces.',
       });
-      P.slider(sec, {
+      P.slider(lens, {
         label: 'Aperture',
         steps: APERTURES,
         get: () => s().camera.aperture,
         set: (v) => (s().camera.aperture = v),
         format: formatAperture,
+        ticks: [1.4, 2.8, 5.6, 11, 22],
         parse: (t) => parseFloat(t.replace(/^f\s*\/?/i, '')),
         hint: 'Lower f-number = wider opening = shallower depth of field.',
       });
-      P.slider(sec, {
+      const focus = P.group(sec, 'Focus');
+      P.slider(focus, {
         label: 'Focus distance',
         min: 0.4,
         max: 20,
         step: 0.01,
+        log: true,
+        ticks: [[0.5, '0.5 m'], [1, '1 m'], [2, '2 m'], [5, '5 m'], [10, '10 m'], [20, '20 m']],
         get: () => s().camera.focusDistance,
         set: (v) => {
           s().camera.focusDistance = v;
@@ -778,13 +867,13 @@ export class App {
         },
         format: (v) => `${v.toFixed(2)} m`,
       });
-      P.toggle(sec, {
+      P.toggle(focus, {
         label: 'Autofocus on the eyes',
         get: () => s().camera.trackFocus,
         set: (v) => (s().camera.trackFocus = v),
         hint: 'Or double-click anything in the view to focus there.',
       });
-      const dofBox = P.group(sec, '', 'readouts');
+      const dofBox = P.group(focus, '', 'readouts');
       P.readout(dofBox, 'Depth of field', () => {
         const c = s().camera;
         const d = depthOfField(c.focalLength, c.aperture, c.focusDistance);
@@ -792,7 +881,7 @@ export class App {
         return `${formatDistance(d.near)} – ${formatDistance(d.far)} <span class="muted">(${isFinite(total) ? formatDistance(total) : '∞'})</span>`;
       });
       const vis = P.el('div', 'row-2');
-      sec.appendChild(vis);
+      focus.appendChild(vis);
       P.toggle(vis, { label: 'In-focus zone', get: () => s().camera.showFocusZone, set: (v) => (s().camera.showFocusZone = v) });
       P.toggle(vis, { label: 'Focus plane', get: () => s().camera.showFocusPlane, set: (v) => (s().camera.showFocusPlane = v) });
 
@@ -826,6 +915,7 @@ export class App {
         get: () => s().camera.exposureComp,
         set: (v) => (s().camera.exposureComp = v),
         format: (v) => `${v >= 0 ? '+' : ''}${v.toFixed(1)} EV`,
+        ticks: [[-3, '−3'], [-2, '−2'], [-1, '−1'], [0, '0'], [1, '+1'], [2, '+2'], [3, '+3']],
         hint: 'Auto keeps the face correctly exposed so you can play with aperture freely.',
       });
       const manual = P.el('div');
@@ -837,6 +927,7 @@ export class App {
         get: () => s().camera.shutter,
         set: (v) => (s().camera.shutter = v),
         format: formatShutter,
+        ticks: [[1, '1s'], [1 / 30, '1/30'], [1 / 250, '1/250'], [1 / 8000, '1/8000']],
         parse: parseShutter,
         hint: 'Controls ambient & continuous light only. Strobes fire faster than any shutter — above 1/250 they get cut off.',
       });
@@ -846,6 +937,7 @@ export class App {
         get: () => s().camera.iso,
         set: (v) => (s().camera.iso = v),
         format: (v) => String(v),
+        ticks: [100, 400, 1600, 6400],
       });
       const meterBox = P.group(exg, '', 'readouts');
       P.readout(meterBox, 'Meter at face', () => {
@@ -876,18 +968,24 @@ export class App {
         get: () => s().camera.whiteBalance,
         set: (v) => (s().camera.whiteBalance = v),
         format: (v) => `${Math.round(v)} K`,
+        kelvin: true,
+        ticks: [3200, 5600, 7500],
       });
-      P.buttons(wb, [
-        { label: 'Tungsten', title: '3200 K', onClick: () => (s().camera.whiteBalance = 3200), active: () => s().camera.whiteBalance === 3200 },
-        { label: 'Daylight', title: '5600 K', onClick: () => (s().camera.whiteBalance = 5600), active: () => s().camera.whiteBalance === 5600 },
-        { label: 'Cloudy', title: '6500 K', onClick: () => (s().camera.whiteBalance = 6500), active: () => s().camera.whiteBalance === 6500 },
-        { label: 'Shade', title: '7500 K', onClick: () => (s().camera.whiteBalance = 7500), active: () => s().camera.whiteBalance === 7500 },
-      ], 'cols-4 small');
+      P.buttons(
+        wb,
+        WB_PRESETS.map((w) => ({
+          label: w.label,
+          title: `${w.k} K`,
+          onClick: () => (s().camera.whiteBalance = w.k),
+          active: () => s().camera.whiteBalance === w.k,
+        })),
+        'cols-5 small',
+      );
     }
 
     // Subject & scene
     {
-      const sec = P.section(scroll, 'Subject & scene', false, '☺');
+      const sec = page('subject', 'Subject', 'Who you are photographing and what is around them.');
       const modelPick = P.segmented(sec, {
         label: 'Subject',
         options: [
@@ -907,6 +1005,7 @@ export class App {
         get: () => s().subject.turn,
         set: (v) => (s().subject.turn = v),
         format: (v) => (Math.abs(v) < 1 ? 'facing camera' : `${Math.abs(Math.round(v))}° ${v < 0 ? 'to cam-left' : 'to cam-right'}`),
+        ticks: [[-90, 'left'], [0, 'camera'], [90, 'right']],
         hint: 'Turn the face away from the key for short lighting, toward it for broad.',
       });
       const bgd = P.slider(sec, {
@@ -917,6 +1016,7 @@ export class App {
         get: () => s().subject.backgroundDistance,
         set: (v) => (s().subject.backgroundDistance = v),
         format: (v) => `${v.toFixed(2)} m`,
+        ticks: [[1, '1 m'], [2, '2 m'], [4, '4 m'], [6, '6 m']],
         hint: 'Move the subject away from the backdrop to darken it and blur it more.',
       });
       P.showIf(bgd, () => s().env.mode === 'studio');
@@ -928,7 +1028,7 @@ export class App {
 
     // Environment
     {
-      const sec = P.section(scroll, 'Environment', true, '☀');
+      const sec = page('scene', 'Scene', 'A studio, open sky, or a real place.');
       P.segmented(sec, {
         options: [
           { value: 'studio', label: 'Studio', title: 'Seamless backdrop in a studio' },
@@ -955,6 +1055,7 @@ export class App {
         get: () => s().env.ambient,
         set: (v) => (s().env.ambient = v),
         format: (v) => `${Math.round(v)} lux`,
+        ticks: [[0, 'dark'], [100, '100'], [200, '200'], [400, '400 lux']],
         hint: 'Modelling lights and spill. Keep it low so your strobes do the work.',
       });
 
@@ -979,6 +1080,7 @@ export class App {
           const hh = ((h + 11) % 12) + 1;
           return `${hh}:${String(m === 60 ? 0 : m).padStart(2, '0')} ${h < 12 ? 'am' : 'pm'}`;
         },
+        ticks: [[6, '6am'], [9, '9am'], [12, 'noon'], [15, '3pm'], [18, '6pm'], [21, '9pm']],
       });
       P.slider(out, {
         label: 'Sun direction',
@@ -988,6 +1090,7 @@ export class App {
         get: () => s().env.sunAzimuth,
         set: (v) => (s().env.sunAzimuth = v),
         format: (v) => (Math.abs(v) < 1 ? 'behind camera' : Math.abs(v) > 179 ? 'behind subject' : `${Math.abs(Math.round(v))}° ${v < 0 ? 'cam-left' : 'cam-right'}`),
+        ticks: [[-180, 'backlit'], [-90, 'left'], [0, 'front'], [90, 'right'], [180, 'backlit']],
         hint: '0° = sun behind you (flat light). 180° = backlight.',
       });
       P.segmented(out, {
@@ -1022,6 +1125,7 @@ export class App {
         get: () => s().env.sunAzimuth,
         set: (v) => (s().env.sunAzimuth = v),
         format: (v) => (Math.abs(v) < 1 ? 'behind camera' : Math.abs(v) > 179 ? 'behind subject' : `${Math.abs(Math.round(v))}° ${v < 0 ? 'cam-left' : 'cam-right'}`),
+        ticks: [[-180, 'backlit'], [-90, 'left'], [0, 'front'], [90, 'right'], [180, 'backlit']],
         hint: 'Spins the whole place around the subject. Where there is no sun, it turns the brightest side.',
       });
       const locInfo = P.group(loc, '', 'readouts');
@@ -1052,7 +1156,7 @@ export class App {
 
     // View
     {
-      const sec = P.section(scroll, 'View', false, '▣');
+      const sec = page('view', 'View', 'Overlays, reset and credits.');
       P.toggle(sec, { label: 'Show stands & modifiers', get: () => s().view.showGear, set: (v) => (s().view.showGear = v) });
       P.toggle(sec, { label: 'Show top-view diagram', get: () => s().view.showDiagram, set: (v) => (s().view.showDiagram = v) });
       P.buttons(sec, [{ label: 'Reset everything', onClick: () => this.applyPreset(SCENARIO_PRESETS[0]) }]);

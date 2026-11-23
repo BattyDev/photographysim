@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { placedModel } from './assets';
 import { HdriLibrary, type HdriData } from './hdri';
 import { kelvinToRGB, srgbToLinear } from './photo';
-import type { SimState, Weather } from './state';
+import type { LocationId, SimState, Weather } from './state';
 import { loadFigure, type Figure } from './subject';
 
 /** Exposure context shared by everything that emits or reflects light. */
@@ -197,13 +197,14 @@ export class World {
   private figure: Figure | null = null;
   private lamps = new THREE.Group();
   private lampBulbs: THREE.MeshStandardMaterial[] = [];
-  private shadowCatcher: THREE.Mesh<THREE.PlaneGeometry, THREE.ShadowMaterial>;
-  private skybox: THREE.Object3D | null = null;
+  private place: THREE.Object3D | null = null;
   readonly hdri: HdriLibrary;
   private locInfo: LocationInfo | null = null;
   /** Asset groups already requested, so each is fetched only when first needed. */
   private requested = new Set<string>();
   private locSunDir: THREE.Vector3 | null = null;
+  /** Location whose sharp detail layer is loaded (only one at a time). */
+  private detailFor: LocationId | null = null;
   private bulbs: THREE.InstancedMesh;
   private bulbMat = new THREE.MeshBasicMaterial({ color: '#ffffff' });
   private bulbsStudio: THREE.Matrix4[] = [];
@@ -214,7 +215,7 @@ export class World {
 
   constructor(
     private scene: THREE.Scene,
-    renderer: THREE.WebGLRenderer,
+    private renderer: THREE.WebGLRenderer,
     private onAssetLoaded: () => void,
   ) {
     scene.add(this.studio, this.outdoor, this.location, this.props, this.hemi, this.sun, this.sun.target);
@@ -277,12 +278,6 @@ export class World {
     path.position.set(0.3, 0.004, -40);
     path.receiveShadow = true;
     this.outdoor.add(path);
-    // Ground shadows for HDRI locations (the panorama's floor can't receive them).
-    this.shadowCatcher = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), new THREE.ShadowMaterial({ opacity: 0.5 }));
-    this.shadowCatcher.rotation.x = -Math.PI / 2;
-    this.shadowCatcher.position.y = 0.002;
-    this.shadowCatcher.receiveShadow = true;
-    this.location.add(this.shadowCatcher);
 
     // Sun.
     this.sun.castShadow = true;
@@ -460,6 +455,13 @@ export class World {
     this.locInfo = null;
     this.locSunDir = null;
 
+    // Keep only the visible location's sharp layer in GPU memory.
+    const want = mode === 'location' ? s.env.location : null;
+    if (this.detailFor && this.detailFor !== want) {
+      this.hdri.dropDetail(this.detailFor);
+      this.requested.delete(`detail:${this.detailFor}`);
+      this.detailFor = null;
+    }
     if (mode === 'studio') this.need('studio_loft', () => this.hdri.load('studio_loft'));
     if (outdoor) this.need('outdoor', () => this.dressOutdoor());
     if (s.subject.foregroundProp) this.need('plant', () => this.loadPlant());
@@ -496,17 +498,27 @@ export class World {
         this.scene.background = new THREE.Color(0.02, 0.02, 0.025);
         this.sun.visible = false;
         this.sun.castShadow = false;
-        if (this.skybox) this.skybox.visible = false;
+        if (this.place) this.place.visible = false;
       } else {
         const rot = this.locationRotation(s, h);
-        if (this.skybox !== h.skybox) {
-          if (this.skybox) this.location.remove(this.skybox);
-          this.skybox = h.skybox;
-          this.location.add(h.skybox);
+        if (this.place !== h.place.group) {
+          if (this.place) this.location.remove(this.place);
+          this.place = h.place.group;
+          this.location.add(h.place.group);
         }
-        h.skybox.visible = true;
-        h.skybox.rotation.y = rot;
-        h.skybox.material.color.setScalar(cont);
+        const id = s.env.location;
+        this.need(`detail:${id}`, () =>
+          this.hdri.loadDetail(id, this.renderer).then(() => {
+            // Moved on while it downloaded: don't keep it.
+            if (this.detailFor !== id) {
+              this.hdri.dropDetail(id);
+              this.requested.delete(`detail:${id}`);
+            }
+          }),
+        );
+        this.detailFor = id;
+        h.place.group.visible = true;
+        h.place.update(cont, rot);
         this.scene.background = null;
         this.scene.environment = h.envMap;
         this.scene.environmentIntensity = cont;
@@ -514,7 +526,6 @@ export class World {
         const hasSun = !!h.sunDir && h.sunE > 0;
         this.sun.visible = hasSun;
         this.sun.castShadow = hasSun;
-        let sunGround = 0;
         if (hasSun) {
           const dir = h.sunDir!.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), rot);
           this.sun.color.copy(h.sunColor);
@@ -522,12 +533,8 @@ export class World {
           this.sun.position.copy(dir).multiplyScalar(40).add(new THREE.Vector3(0, 1, -1));
           this.sun.target.position.set(0, 1, -1);
           this.sun.shadow.radius = Math.max(1, (0.012 * 0.5) / (14 / 2048));
-          sunGround = h.sunE * Math.max(0, dir.y);
           this.locSunDir = dir;
         }
-        const skyGround = HdriLibrary.irradiance(h, new THREE.Vector3(0, 1, 0), rot);
-        // Fraction of the ground's light a shadow removes (sun shadows), or a soft default for strobes.
-        this.shadowCatcher.material.opacity = hasSun ? (0.85 * sunGround) / (sunGround + skyGround) : 0.45;
         const el = h.sunDir ? THREE.MathUtils.radToDeg(Math.asin(h.sunDir.y)) : null;
         this.locInfo = { sunElevation: el, sunKelvin: h.spec.kelvin, lux: h.spec.lux };
       }
