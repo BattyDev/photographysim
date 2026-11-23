@@ -12,7 +12,7 @@ All third-party assets in `public/assets/`. Everything is CC0 (public domain) ex
 
 ## MIT (keep this notice)
 
-The people are five avatars from the [Microsoft Rocketbox Avatar Library](https://github.com/microsoft/Microsoft-Rocketbox): Female_Adult_15 (solo), Male_Adult_08, Female_Adult_07, Male_Child_01 and Female_Child_01 (the family). Converted from FBX to GLB in Blender with WebP textures at 1–2k. Files: `models/rocketbox/*.glb`.
+The people are five avatars from the [Microsoft Rocketbox Avatar Library](https://github.com/microsoft/Microsoft-Rocketbox): Female_Adult_15 (solo), Male_Adult_08, Female_Adult_07, Male_Child_01 and Female_Child_01 (the family), and Dog_Beagle_01 (the family dog, colour map only). Converted from FBX to GLB in Blender with WebP textures at 1–2k. Files: `models/rocketbox/*.glb`.
 
 > MIT License
 >

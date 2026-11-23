@@ -7,7 +7,7 @@
 import * as THREE from 'three';
 import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { loadGLTF, loadTexture, placedModel, prepareModel } from './assets';
-import { loadPerson, type PersonId } from './person';
+import { loadDog, loadPerson, type Dog, type PersonId } from './person';
 import type { GroupPoseId, PoseId, SubjectState } from './state';
 
 const D = THREE.MathUtils.degToRad;
@@ -511,6 +511,7 @@ export class Subject {
   private requested = new Set<string>();
   private state: SubjectState | null = null;
   private ray = new THREE.Raycaster();
+  private dog: Dog | null = null;
   /** On the sofa the children sit too, at the ends. */
   private onSofa = false;
 
@@ -577,6 +578,29 @@ export class Subject {
     for (const m of this.members) m.holder.visible = group;
     for (const k of Object.keys(this.others) as ('headscan' | 'bust')[]) this.others[k]!.group.visible = !group && k === model;
     for (const k of Object.keys(this.seats) as SeatId[]) this.seats[k]!.visible = k === seatId;
+
+    // The dog: at the feet of whoever is being photographed.
+    const withDog = s.dog && (group || model === 'mannequin');
+    if (withDog) {
+      this.need('dog', () =>
+        loadDog().then((d) => {
+          this.dog = d;
+          this.group.add(d.root);
+        }),
+      );
+    }
+    if (this.dog) {
+      this.dog.root.visible = withDog;
+      // [x, z, body yaw, head turn]: side-on in front of the family, or beside one person.
+      const spot: [number, number, number, number] = !group
+        ? [0.5, 0.3, -70, 50]
+        : sits
+          ? [0.15, 0.78, -80, 55]
+          : s.groupPose === 'casual'
+            ? [-0.3, 0.62, 75, -50]
+            : [0.62, 0.55, -75, 50];
+      this.dog.place(...spot);
+    }
 
     // Turn and pose.
     this.group.rotation.y = D(s.turn);
