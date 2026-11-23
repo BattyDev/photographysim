@@ -35,9 +35,7 @@ Built with Three.js + Vite + TypeScript. See [PLAN.md](PLAN.md) for the design b
     over the shoulder (rim), chin up (butterfly), hand to chin (hand shadows).
     The family is a father, mother, son and daughter. Poses are set on an
     invisible rigged mannequin and copied joint by joint onto each person's
-    skeleton (`src/person.ts`), so one set of poses drives everyone. A
-    **Dog** switch adds the family beagle at their feet, its head turned to
-    the camera (on in Family at home).
+    skeleton (`src/person.ts`), so one set of poses drives everyone.
   - a scanned human head, for studying light patterns on a real face
   - a marble bust
 

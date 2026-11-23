@@ -185,8 +185,7 @@ The last page opened is saved in `localStorage` (`photographysim.page`) and reop
   - 5 chips (`.cols-5.small`): Tungsten (3200 K), Fluoro (4000 K), Daylight (5600 K), Cloudy (6500 K), Shade (7500 K). The matching chip is `.active`.
 
 ### 5.4 Subject page (person icon)
-- **Subject**: segmented control with Person, Head scan, Marble bust. Each option has a tooltip. Solo only (the group is always the family of four people).
-- **Dog**: toggle with a hint, shown for the person or the family. Adds a beagle at their feet. Poses are in Quick starts.
+- **Subject**: segmented control with Person, Head scan, Marble bust. Each option has a tooltip. Solo only (the group is always the family of four people). Poses are in Quick starts.
 - **Turn**: slider from −90° to 90°, e.g. "facing camera" or "30° to cam-left". Hint about short vs broad lighting.
 - **Subject to backdrop**: slider from 0.8 to 6 m, with a hint. Studio only.
 - **Group "Depth props"**: toggles.

@@ -165,55 +165,6 @@ export class Person {
   }
 }
 
-/**
- * The family beagle (Rocketbox, MIT), standing. `place` sets where it stands
- * and which way its body points; its head then turns toward the camera.
- */
-export class Dog {
-  readonly root = new THREE.Group();
-  private head: THREE.Bone;
-  private neck: THREE.Bone;
-  private restHead: THREE.Quaternion;
-  private restNeck: THREE.Quaternion;
-
-  constructor(scene: THREE.Object3D) {
-    const model = SkeletonUtils.clone(scene);
-    prepareModel(model);
-    this.root.add(model);
-    const bones = new Map<string, THREE.Bone>();
-    model.traverse((o) => {
-      if ((o as THREE.Bone).isBone) bones.set(o.name.replace(/^beagle[ _]/, '').replace(/_/g, ' '), o as THREE.Bone);
-    });
-    this.head = bones.get('Head')!;
-    this.neck = bones.get('Neck2')!;
-    this.restHead = this.head.quaternion.clone();
-    this.restNeck = this.neck.quaternion.clone();
-  }
-
-  /** Stand at (x, z) in the subject's frame, body turned `yaw` (deg), looking `look` (deg) further round. */
-  place(x: number, z: number, yaw: number, look: number) {
-    this.root.position.set(x, 0, z);
-    this.root.rotation.y = THREE.MathUtils.degToRad(yaw);
-    this.head.quaternion.copy(this.restHead);
-    this.neck.quaternion.copy(this.restNeck);
-    this.root.updateMatrixWorld(true);
-    // Split the look between the neck and the head, each about the dog's own up axis.
-    const up = new THREE.Vector3(0, 1, 0);
-    for (const b of [this.neck, this.head]) {
-      const pq = b.parent!.getWorldQuaternion(new THREE.Quaternion());
-      const rootQ = this.root.getWorldQuaternion(new THREE.Quaternion());
-      const r = new THREE.Quaternion().setFromAxisAngle(up.clone().applyQuaternion(rootQ), THREE.MathUtils.degToRad(look / 2));
-      b.quaternion.premultiply(pq.clone().invert().multiply(r).multiply(pq));
-      b.updateMatrixWorld(true);
-    }
-  }
-}
-
-export async function loadDog(): Promise<Dog> {
-  const gltf = await loadGLTF('models/rocketbox/dog_beagle_01.glb');
-  return new Dog(gltf.scene);
-}
-
 export async function loadPerson(id: PersonId): Promise<Person> {
   const [avatar, mannequin] = await Promise.all([loadGLTF(`models/rocketbox/${id}.glb`), loadGLTF('models/mannequin.glb')]);
   return new Person(avatar.scene, mannequin.scene);

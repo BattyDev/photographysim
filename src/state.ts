@@ -131,8 +131,6 @@ export interface SubjectState {
   backgroundProp: boolean;
   /** Picnic tables at middle and far distances (outdoor locations). */
   picnic: boolean;
-  /** The family beagle, at the subject's feet. */
-  dog: boolean;
   bokehLights: boolean;
 }
 
@@ -244,7 +242,6 @@ export function defaultState(): SimState {
       backgroundFigure: false,
       backgroundProp: false,
       picnic: false,
-      dog: false,
       bokehLights: false,
     },
     env: {
@@ -568,10 +565,10 @@ export const SCENARIO_PRESETS: Preset[] = [
     id: 'home',
     label: 'Family at home',
     blurb:
-      'The family on the sofa in a real living room, the dog at their feet, with the windows behind them and an umbrella to camera left as the key. At f/4 the room falls softly out of focus behind them. Try Standing, or Solo.',
+      'The family on the sofa in a real living room, with the windows behind them and an umbrella to camera left as the key. At f/4 the room falls softly out of focus behind them. Try Standing, or Solo.',
     apply: (s) => {
       s.env = { ...s.env, inShade: false, mode: 'location', location: 'living_room', sunAzimuth: HOME_AZIMUTH };
-      s.subject = { ...s.subject, model: 'mannequin', people: 'group', groupPose: 'seated', turn: 0, foregroundProp: false, backgroundFigure: false, bokehLights: false, dog: true };
+      s.subject = { ...s.subject, model: 'mannequin', people: 'group', groupPose: 'seated', turn: 0, foregroundProp: false, backgroundFigure: false, bokehLights: false };
       setLights(s, { key: { azimuth: -38, elevation: 22, distance: 2.8, modifier: 'umbrella', size: 1.5, power: HOME_KEY } });
       s.camera = { ...s.camera, exposureMode: 'auto', exposureComp: 0, whiteBalance: 5200, focalLength: 50, aperture: 4, trackFocus: true };
       return groupView(s);

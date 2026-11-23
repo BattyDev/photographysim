@@ -1147,8 +1147,6 @@ export class App {
         set: (v) => (s().subject.model = v),
       });
       P.showIf(modelPick, () => s().subject.people === 'solo');
-      const dog = P.toggle(sec, { label: 'Dog', get: () => s().subject.dog, set: (v) => (s().subject.dog = v), hint: 'The family beagle, at their feet.' });
-      P.showIf(dog, () => s().subject.people === 'group' || s().subject.model === 'mannequin');
       P.slider(sec, {
         label: 'Turn',
         min: -90,
