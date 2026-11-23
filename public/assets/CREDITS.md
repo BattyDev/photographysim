@@ -10,11 +10,25 @@ All third-party assets in `public/assets/`. Everything is CC0 (public domain) ex
 
 > *Infinite, 3D Head Scan* by Lee Perry-Smith is licensed under a Creative Commons Attribution 3.0 Unported License. Based on a work at www.triplegangers.com.
 
+## MIT (keep this notice)
+
+The people are five avatars from the [Microsoft Rocketbox Avatar Library](https://github.com/microsoft/Microsoft-Rocketbox): Female_Adult_15 (solo), Male_Adult_08, Female_Adult_07, Male_Child_01 and Female_Child_01 (the family). Converted from FBX to GLB in Blender with WebP textures at 1–2k. Files: `models/rocketbox/*.glb`.
+
+> MIT License
+>
+> Copyright (c) 2020 Microsoft
+>
+> Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+>
+> The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+>
+> THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
 ## CC0 (no attribution required, credited anyway)
 
 | Asset | Source | Files |
 |---|---|---|
-| Stylized wooden mannequin (rigged) | [Grab3D](https://grab3d.com/models/characters/stylized-mannequin/). The license notes it is AI-assisted (Meshy) and cleaned up in Blender. | `models/mannequin.glb` |
+| Stylized wooden mannequin (rigged) | [Grab3D](https://grab3d.com/models/characters/stylized-mannequin/). The license notes it is AI-assisted (Meshy) and cleaned up in Blender. Not shown: it is the invisible pose driver for the people. | `models/mannequin.glb` |
 | Marble Bust 01 | [Poly Haven](https://polyhaven.com/a/marble_bust_01) | `models/polyhaven/marble_bust_01/` |
 | Potted Plant 02 | [Poly Haven](https://polyhaven.com/a/potted_plant_02) | `models/polyhaven/potted_plant_02/` |
 | Street Lamp 01 | [Poly Haven](https://polyhaven.com/a/street_lamp_01) | `models/polyhaven/street_lamp_01/` |

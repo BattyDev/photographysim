@@ -30,16 +30,19 @@ Built with Three.js + Vite + TypeScript. See [PLAN.md](PLAN.md) for the design b
   casual, or seated (on apple boxes in the studio, a park bench outdoors, the
   sofa in the living room, where the children sit too).
 - **Subject & scene**: three ready-made subjects:
-  - a rigged wooden mannequin with 9 poses, set by rotating its bones. Several
+  - a real-looking person (Microsoft Rocketbox avatars) with 9 poses. Several
     are there to show light off: three-quarter (short vs broad), profile (split),
-    over the shoulder (rim), chin up (butterfly), hand to chin (hand shadows)
+    over the shoulder (rim), chin up (butterfly), hand to chin (hand shadows).
+    The family is a father, mother, son and daughter. Poses are set on an
+    invisible rigged mannequin and copied joint by joint onto each person's
+    skeleton (`src/person.ts`), so one set of poses drives everyone.
   - a scanned human head, for studying light patterns on a real face
   - a marble bust
 
   Turn control for all of them. Seated poses sit on apple boxes, the plywood
   boxes portrait studios use. Depth props: something in front (a potted plant
   indoors, a tree stump outdoors), a boulder a few metres behind (outdoors),
-  picnic tables at about 4 m and 8 m behind (outdoors), a second mannequin,
+  picnic tables at about 4 m and 8 m behind (outdoors), a second person,
   string lights and street lamps for bokeh. The living room comes furnished:
   sofa, mid-century armchair, round coffee table, side table and a potted
   money tree, at near, middle and far distances. Subject-to-backdrop
@@ -101,7 +104,7 @@ head scan:
 
 Nothing heavy is in the JS bundle. Each model, HDRI and prop is fetched the
 first time a view needs it, so the default Outdoor solo shoot loads only the
-mannequin and the field-at-sunrise HDRI. The family, seats, other locations, props and
+solo person and the field-at-sunrise HDRI. The family, seats, other locations, props and
 alternate subjects load when picked.
 
 Assets are served from `public/assets/` by default. To host them elsewhere
@@ -129,7 +132,8 @@ Pushing to `main` deploys to GitHub Pages via `.github/workflows/pages.yml`.
 | `src/world.ts` | Studio cyc, open-sky sun model, location mode, props |
 | `src/hdri.ts` | HDRI locations: sun extraction, lux calibration, metering grid, room measurements |
 | `src/projection.ts` | Panorama projected onto relightable proxy surfaces, with the sharp detail layer |
-| `src/subject.ts` | Mannequin bone poses, family group poses and seats, head scan, bust |
+| `src/subject.ts` | Bone poses (on the mannequin), family group poses and seats, head scan, bust |
+| `src/person.ts` | Rocketbox people, posed by copying the mannequin's joint turns onto their skeletons |
 | `src/assets.ts` | glTF / texture / HDR loading helpers |
 | `src/pipeline.ts` | HDR render → thin-lens bokeh → white balance → tone map |
 | `src/diagram.ts` | Top-down lighting diagram |

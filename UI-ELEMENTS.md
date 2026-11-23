@@ -114,7 +114,7 @@ The last page opened is saved in `localStorage` (`photographysim.page`) and reop
 - **Group "Shoots"**: `.button-grid.cols-3` of `.chip` buttons, with the last one picked shown `.active`. The tooltip is the shoot's blurb.
   - Outdoor solo, Outdoor family, Indoor. The app opens on Outdoor solo.
   - **People**: segmented control, Solo | Group (a family of four). Switching re-runs the current shoot for the new group size: outdoor swaps between Outdoor solo and Outdoor family; Indoor stays Indoor and moves its lights back for the group.
-  - **Pose** (solo only): `.button-grid.cols-3.small` of `.chip` buttons, with tooltips that say what each pose shows off. Picking one switches the subject to the mannequin.
+  - **Pose** (solo only): `.button-grid.cols-3.small` of `.chip` buttons, with tooltips that say what each pose shows off. Picking one switches the subject to the person.
     - Standing, Three-quarter, Profile, Over shoulder, Chin up, Hand to chin, Hand on hip, Arms crossed, Seated (on an apple box).
   - **Group pose** (group only): segmented control, Standing | Casual | Seated. Seated puts them on apple boxes in the studio, a park bench outdoors, or the sofa in the living room (the children sit too). Picking one reframes the camera.
 - **Group "Lighting setups"**: `.button-grid`, 2 columns of `.chip` buttons. The tooltip on each button is a one-line description.
@@ -185,7 +185,7 @@ The last page opened is saved in `localStorage` (`photographysim.page`) and reop
   - 5 chips (`.cols-5.small`): Tungsten (3200 K), Fluoro (4000 K), Daylight (5600 K), Cloudy (6500 K), Shade (7500 K). The matching chip is `.active`.
 
 ### 5.4 Subject page (person icon)
-- **Subject**: segmented control with Mannequin, Head scan, Marble bust. Each option has a tooltip. Solo only (the group is always mannequins). Poses are in Quick starts.
+- **Subject**: segmented control with Person, Head scan, Marble bust. Each option has a tooltip. Solo only (the group is always the family of four people). Poses are in Quick starts.
 - **Turn**: slider from −90° to 90°, e.g. "facing camera" or "30° to cam-left". Hint about short vs broad lighting.
 - **Subject to backdrop**: slider from 0.8 to 6 m, with a hint. Studio only.
 - **Group "Depth props"**: toggles.

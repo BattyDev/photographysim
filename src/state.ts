@@ -120,7 +120,7 @@ export interface SubjectState {
   pose: PoseId;
   turn: number; // deg, + turns subject toward camera right
   model: SubjectModel;
-  /** One person, or a family of four (mannequins). */
+  /** One person, or a family of four. */
   people: People;
   groupPose: GroupPoseId;
   backgroundDistance: number; // subject to backdrop (studio)

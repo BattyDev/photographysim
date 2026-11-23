@@ -5,7 +5,8 @@ import { Backdrop, MAX_BACKDROP_DISTANCE, paperWidth } from './backdrop';
 import { HdriLibrary, locationSpec, type HdriData } from './hdri';
 import { kelvinToRGB, srgbToLinear } from './photo';
 import type { LocationId, SimState, Weather } from './state';
-import { loadFigure, type Figure } from './subject';
+import { loadPerson } from './person';
+import type { Poseable } from './subject';
 
 /** Exposure context shared by everything that emits or reflects light. */
 export interface Exposure {
@@ -177,7 +178,7 @@ export class World {
    * sees: it casts the shadow but never shows up or takes part in focusing.
    */
   private shadeCaster: THREE.Mesh;
-  private figure: Figure | null = null;
+  private figure: Poseable | null = null;
   private lamps = new THREE.Group();
   private lampBulbs: THREE.MeshStandardMaterial[] = [];
   private place: THREE.Object3D | null = null;
@@ -378,7 +379,7 @@ export class World {
   }
 
   private loadBackgroundFigure() {
-    return loadFigure().then((f) => {
+    return loadPerson('male_adult_08').then((f) => {
       f.setPose('crossed');
       f.root.rotation.y = THREE.MathUtils.degToRad(-25);
       this.figure = f;

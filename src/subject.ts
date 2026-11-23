@@ -7,6 +7,7 @@
 import * as THREE from 'three';
 import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { loadGLTF, loadTexture, placedModel, prepareModel } from './assets';
+import { loadPerson, type PersonId } from './person';
 import type { GroupPoseId, PoseId, SubjectState } from './state';
 
 const D = THREE.MathUtils.degToRad;
@@ -85,7 +86,7 @@ const POSES: Record<PoseId, BoneTurn[]> = {
     // Solved so the right wrist rests just under the chin with the forearm upright.
     ['RightArm', 'x', -70],
     ['RightArm', 'z', 60],
-    ['RightForeArm', 'x', -100],
+    ['RightForeArm', 'x', -106],
     ['RightForeArm', 'y', 140],
     ['LeftArm', 'z', -24],
     ['LeftForeArm', 'x', -12],
@@ -109,14 +110,14 @@ const POSES: Record<PoseId, BoneTurn[]> = {
   ],
   crossed: [
     ['Head', 'x', 3],
-    ['LeftArm', 'z', -20],
-    ['LeftArm', 'x', -22],
-    ['RightArm', 'z', 20],
-    ['RightArm', 'x', -22],
-    ['LeftForeArm', 'x', -95],
-    ['LeftForeArm', 'y', -62],
-    ['RightForeArm', 'x', -88],
-    ['RightForeArm', 'y', 58],
+    ['LeftArm', 'z', -24],
+    ['LeftArm', 'x', -8],
+    ['RightArm', 'z', 24],
+    ['RightArm', 'x', -8],
+    ['LeftForeArm', 'x', -78],
+    ['LeftForeArm', 'y', -78],
+    ['RightForeArm', 'x', -72],
+    ['RightForeArm', 'y', 74],
     ['LeftUpLeg', 'z', 2],
     ['RightUpLeg', 'z', -2],
   ],
@@ -142,8 +143,16 @@ const POSES: Record<PoseId, BoneTurn[]> = {
 
 const AXES = { x: new THREE.Vector3(1, 0, 0), y: new THREE.Vector3(0, 1, 0), z: new THREE.Vector3(0, 0, 1) };
 
+/** Anything that takes the poses: the mannequin, or a person driven by it. */
+export interface Poseable {
+  readonly root: THREE.Object3D;
+  setPose(id: PoseId, scale?: number, seatY?: number): void;
+  hipPoint(out?: THREE.Vector3): THREE.Vector3;
+  eyePosition(out: THREE.Vector3): THREE.Vector3;
+}
+
 /** One posable copy of the mannequin. */
-export class Figure {
+export class Figure implements Poseable {
   readonly root = new THREE.Group();
   private bones = new Map<string, THREE.Bone>();
   private rest = new Map<THREE.Bone, THREE.Quaternion>();
@@ -169,6 +178,22 @@ export class Figure {
     const head = this.bones.get('Head')!;
     const eyeWorld = head.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0, 0.11, 0.1));
     head.worldToLocal(this.eyeLocal.copy(eyeWorld));
+  }
+
+  bone(name: string): THREE.Bone {
+    const b = this.bones.get(name);
+    if (!b) throw new Error(`no bone ${name}`);
+    return b;
+  }
+
+  /** Back to the rest pose at `scale`, standing at the origin. */
+  resetPose(scale = 1) {
+    this.poseKey = '';
+    for (const [b, q] of this.rest) b.quaternion.copy(q);
+    this.bones.get('Hips')!.position.copy(this.hipsRest);
+    this.root.position.set(0, 0, 0);
+    this.root.scale.setScalar(scale);
+    this.root.updateMatrixWorld(true);
   }
 
   /** Hip joint position in the figure's parent frame (for finding the seat under it). */
@@ -237,6 +262,11 @@ export async function loadFigure(): Promise<Figure> {
   return new Figure(gltf.scene);
 }
 
+/** The family, in GROUP_POSES member order: father, mother, older and younger child. */
+const FAMILY: PersonId[] = ['male_adult_08', 'female_adult_07', 'male_child_01', 'female_child_01'];
+/** The person for solo portraits. */
+const SOLO: PersonId = 'female_adult_15';
+
 // ------------------------------------------------------------------ group
 
 interface MemberSpec {
@@ -274,8 +304,9 @@ export const GROUP_POSES: Record<GroupPoseId, { label: string; members: MemberSp
     members: [
       { scale: 1, x: -0.42, z: -0.02, yaw: 4, pose: 'seated' },
       { scale: 0.93, x: 0.42, z: -0.02, yaw: -4, pose: 'seated' },
-      { scale: 0.72, x: -1.05, z: 0.12, yaw: 18, pose: 'standing' },
-      { scale: 0.58, x: 1.0, z: 0.18, yaw: -16, pose: 'standing' },
+      // The children stand behind the seat, between and behind their parents.
+      { scale: 0.72, x: -0.86, z: -0.66, yaw: 10, pose: 'standing' },
+      { scale: 0.58, x: 0.86, z: -0.64, yaw: -10, pose: 'standing' },
     ],
   },
 };
@@ -473,8 +504,8 @@ const SEATS: Record<SeatId, (loaded: () => void) => THREE.Group> = {
 export class Subject {
   /** Turned as a whole by the "Turn" control. */
   readonly group = new THREE.Group();
-  private solo: Figure | null = null;
-  private members: { figure: Figure; holder: THREE.Group }[] = [];
+  private solo: Poseable | null = null;
+  private members: { figure: Poseable; holder: THREE.Group }[] = [];
   private others: Partial<Record<'headscan' | 'bust', { group: THREE.Group; eye: THREE.Vector3 }>> = {};
   private seats: Partial<Record<SeatId, THREE.Group>> = {};
   private requested = new Set<string>();
@@ -510,7 +541,7 @@ export class Subject {
     // Fetch what this view needs.
     if (model === 'mannequin' && !group) {
       this.need('solo', () =>
-        loadFigure().then((f) => {
+        loadPerson(SOLO).then((f) => {
           this.solo = f;
           this.group.add(f.root);
         }),
@@ -518,9 +549,8 @@ export class Subject {
     }
     if (group) {
       this.need('group', async () => {
-        const gltf = await loadGLTF('models/mannequin.glb');
-        for (let i = 0; i < 4; i++) {
-          const figure = new Figure(gltf.scene);
+        const people = await Promise.all(FAMILY.map((id) => loadPerson(id)));
+        for (const figure of people) {
           const holder = new THREE.Group();
           holder.add(figure.root);
           this.group.add(holder);
@@ -568,7 +598,7 @@ export class Subject {
   }
 
   /** Height of the seat surface under a figure's hips, by casting a ray down onto the seat. */
-  private seatHeight(seat: THREE.Object3D | undefined, figure: Figure): number {
+  private seatHeight(seat: THREE.Object3D | undefined, figure: Poseable): number {
     if (!seat) return 0.47;
     seat.updateMatrixWorld(true);
     const hip = figure.hipPoint();
