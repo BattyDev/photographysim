@@ -92,7 +92,7 @@ const POSES: Record<PoseId, BoneTurn[]> = {
     ['LeftArm', 'z', -30],
     ['LeftArm', 'x', -4],
     ['LeftForeArm', 'x', -26],
-    ['RightArm', 'z', 30],
+    ['RightArm', 'z', 26],
     ['RightArm', 'x', 4],
     ['RightForeArm', 'x', -18],
   ],
@@ -106,6 +106,8 @@ const POSES: Record<PoseId, BoneTurn[]> = {
     ['Head', 'y', -44],
     ['Head', 'z', 6],
     ...ARMS_LOOSE,
+    // A touch wider on the near arm, so its hand clears the hip.
+    ['LeftArm', 'z', 5],
   ],
   // Face lifted into the light: catchlights, butterfly shadow, a lit neck.
   chinup: [
@@ -121,13 +123,13 @@ const POSES: Record<PoseId, BoneTurn[]> = {
   thinker: [
     ...weightOn('right', 0.6),
     ['Hips', 'y', -18],
-    ['Head', 'x', 6],
+    ['Head', 'x', 10],
     ['Head', 'y', 6],
     ['Head', 'z', -3],
     // Solved so the right wrist rests just under the chin with the forearm upright.
-    ['RightArm', 'x', -70],
+    ['RightArm', 'x', -78],
     ['RightArm', 'z', 60],
-    ['RightForeArm', 'x', -106],
+    ['RightForeArm', 'x', -92],
     ['RightForeArm', 'y', 140],
     ['LeftArm', 'z', -32],
     ['LeftForeArm', 'x', -22],
@@ -142,10 +144,10 @@ const POSES: Record<PoseId, BoneTurn[]> = {
     ['RightArm', 'x', -4],
     ['RightForeArm', 'x', -26],
     ['RightForeArm', 'y', 8],
-    ['LeftArm', 'z', 8],
-    ['LeftArm', 'y', 30],
-    ['LeftForeArm', 'z', -82],
-    ['LeftHand', 'z', 20],
+    ['LeftArm', 'z', 24],
+    ['LeftArm', 'y', 38],
+    ['LeftForeArm', 'z', -88],
+    ['LeftHand', 'z', 30],
   ],
   crossed: [
     ...weightOn('left', 0.7),
@@ -157,9 +159,9 @@ const POSES: Record<PoseId, BoneTurn[]> = {
     ['LeftArm', 'x', -8],
     ['RightArm', 'z', 24],
     ['RightArm', 'x', -8],
-    ['LeftForeArm', 'x', -78],
+    ['LeftForeArm', 'x', -84],
     ['LeftForeArm', 'y', -78],
-    ['RightForeArm', 'x', -72],
+    ['RightForeArm', 'x', -66],
     ['RightForeArm', 'y', 74],
   ],
   // Hands loosely clasped in front at the waist.
@@ -172,11 +174,11 @@ const POSES: Record<PoseId, BoneTurn[]> = {
     ['LeftArm', 'z', -30],
     ['LeftArm', 'x', -8],
     ['LeftForeArm', 'x', -26],
-    ['LeftForeArm', 'y', -62],
+    ['LeftForeArm', 'y', -42],
     ['RightArm', 'z', 30],
     ['RightArm', 'x', -8],
     ['RightForeArm', 'x', -26],
-    ['RightForeArm', 'y', 62],
+    ['RightForeArm', 'y', 42],
   ],
   // Hands in the front pockets, thumbs out.
   pockets: [
@@ -295,13 +297,13 @@ const POSES: Record<PoseId, BoneTurn[]> = {
     ['Head', 'x', -20],
     ['Head', 'z', -4],
     ['LeftArm', 'z', -26],
-    ['LeftArm', 'x', -20],
+    ['LeftArm', 'x', -40],
     ['RightArm', 'z', 26],
-    ['RightArm', 'x', -20],
-    ['LeftForeArm', 'x', -40],
-    ['LeftForeArm', 'y', -50],
-    ['RightForeArm', 'x', -40],
-    ['RightForeArm', 'y', 50],
+    ['RightArm', 'x', -40],
+    ['LeftForeArm', 'x', -70],
+    ['LeftForeArm', 'y', -45],
+    ['RightForeArm', 'x', -70],
+    ['RightForeArm', 'y', 45],
   ],
 };
 
@@ -327,6 +329,10 @@ export class Figure implements Poseable {
   /** Point between the eyes, in the Head bone's local frame. */
   private eyeLocal = new THREE.Vector3();
   private poseKey = '';
+  private skin!: THREE.SkinnedMesh;
+  /** Vertex indices, by the bone that mostly moves them: what rests on a seat, and each lower leg and foot. */
+  private seatVerts: number[] = [];
+  private footVerts: Record<'Left' | 'Right', number[]> = { Left: [], Right: [] };
 
   constructor(scene: THREE.Object3D) {
     const model = SkeletonUtils.clone(scene);
@@ -338,7 +344,20 @@ export class Figure implements Poseable {
         this.bones.set(o.name, o as THREE.Bone);
         this.rest.set(o as THREE.Bone, o.quaternion.clone());
       }
+      if ((o as THREE.SkinnedMesh).isSkinnedMesh && !this.skin) this.skin = o as THREE.SkinnedMesh;
     });
+    // Sort the vertices by their main bone, to find contact with the floor and seats.
+    const g = this.skin.geometry;
+    const si = g.attributes.skinIndex;
+    const sw = g.attributes.skinWeight;
+    const names = this.skin.skeleton.bones.map((b) => b.name);
+    for (let i = 0; i < si.count; i++) {
+      let best = 0;
+      for (let k = 1; k < 4; k++) if (sw.getComponent(i, k) > sw.getComponent(i, best)) best = k;
+      const n = names[si.getComponent(i, best)];
+      if (n === 'Hips' || n.endsWith('UpLeg')) this.seatVerts.push(i);
+      for (const side of ['Left', 'Right'] as const) if (n === `${side}Leg` || n === `${side}Foot` || n === `${side}ToeBase`) this.footVerts[side].push(i);
+    }
     const hips = this.bones.get('Hips')!;
     this.hipsRest.copy(hips.position);
     // The head is faceless: put the "eyes" ~11 cm above the Head joint, at the face plane.
@@ -404,17 +423,72 @@ export class Figure implements Poseable {
       bone.quaternion.premultiply(pq.clone().invert().multiply(rq).multiply(pq));
       bone.updateMatrixWorld(true);
     }
-    if (isSeated(id)) {
-      // Drop the figure until the backs of the thighs sit on the seat.
-      const hipY = hips.getWorldPosition(new THREE.Vector3()).y;
-      this.root.position.y = seatY + 0.07 * scale - hipY;
-      this.root.position.z = 0.02;
-    } else {
-      // Keep the lowest foot on the floor.
-      const feet = ['LeftToeBase', 'RightToeBase'].map((n) => this.bones.get(n)!.getWorldPosition(new THREE.Vector3()).y);
-      this.root.position.y = 0.026 * scale - Math.min(feet[0], feet[1]);
-    }
     this.root.updateMatrixWorld(true);
+    if (isSeated(id)) {
+      // Rest the underside of the seat and thighs (near the hips) on the seat, not in it.
+      const hp = hips.getWorldPosition(new THREE.Vector3());
+      const near = (v: THREE.Vector3) => Math.hypot(v.x - hp.x, v.z - hp.z) < 0.2 * scale;
+      this.root.position.y += seatY + 0.004 - this.lowest(this.seatVerts, near);
+      // Children perch nearer the front, so their short thighs carry the knees past the cushion edge.
+      this.root.position.z = scale < 0.85 ? 0.08 : 0.02;
+      this.root.updateMatrixWorld(true);
+      for (const side of ['Left', 'Right'] as const) this.reachFloor(side, scale >= 0.85);
+    } else {
+      // Stand on the lowest point of the soles.
+      this.root.position.y += 0.002 - this.lowest([...this.footVerts.Left, ...this.footVerts.Right]);
+      this.root.updateMatrixWorld(true);
+    }
+  }
+
+  /** Lowest world height among these vertices (optionally only those passing `keep`), as posed now. */
+  private lowest(verts: number[], keep?: (v: THREE.Vector3) => boolean): number {
+    const v = new THREE.Vector3();
+    let min = Infinity;
+    for (const i of verts) {
+      this.skin.getVertexPosition(i, v).applyMatrix4(this.skin.matrixWorld);
+      if ((!keep || keep(v)) && v.y < min) min = v.y;
+    }
+    return min;
+  }
+
+  /**
+   * Seated: open or close the knee so the foot rests on the floor instead of
+   * going through it. Adults' feet are brought down to touch; a child's may
+   * dangle if they don't reach.
+   */
+  private reachFloor(side: 'Left' | 'Right', touch: boolean) {
+    const leg = this.bones.get(`${side}Leg`)!;
+    const base = leg.quaternion.clone();
+    const rootQinv = this.root.getWorldQuaternion(new THREE.Quaternion()).invert();
+    const pq = leg.parent!.getWorldQuaternion(new THREE.Quaternion()).premultiply(rootQinv);
+    const pqInv = pq.clone().invert();
+    const rq = new THREE.Quaternion();
+    const tryAngle = (deg: number) => {
+      rq.setFromAxisAngle(AXES.x, D(deg));
+      leg.quaternion.copy(base).premultiply(pqInv.clone().multiply(rq).multiply(pq));
+      leg.updateMatrixWorld(true);
+      return this.lowest(this.footVerts[side]);
+    };
+    if (!touch) {
+      // A child's legs stick out over the seat edge when they don't reach the floor.
+      const out = tryAngle(-30);
+      if (out >= 0.002) return;
+    }
+    const now = tryAngle(0);
+    if (now >= 0.002 && (!touch || now <= 0.03)) return;
+    // Smallest change that lands the foot between 2 mm and 2 cm above the floor;
+    // failing that, the clear position closest to the floor.
+    let best: { deg: number; y: number } | null = null;
+    let fallback: { deg: number; y: number } | null = null;
+    for (let step = 2; step <= 80; step += 2)
+      for (const deg of [-step, step]) {
+        if (deg > 40) continue;
+        const y = tryAngle(deg);
+        if (y >= 0.002 && y <= 0.02 && !best) best = { deg, y };
+        if (y >= 0.002 && (!fallback || y < fallback.y)) fallback = { deg, y };
+      }
+    const pick = best ?? (touch || now < 0.002 ? fallback : null);
+    tryAngle(pick ? pick.deg : 0);
   }
 
   eyePosition(out: THREE.Vector3): THREE.Vector3 {
@@ -610,7 +684,8 @@ function plywood(w: number, h: number, handle: boolean): THREE.CanvasTexture {
 function appleBox(): THREE.Mesh {
   const { w, h, d } = APPLE;
   const mat = (tw: number, th: number, handle: boolean) =>
-    new THREE.MeshStandardMaterial({ map: plywood(tw, th, handle), roughness: 0.78 });
+    // Stained darker than raw plywood so the pale mannequins stand out against it.
+    new THREE.MeshStandardMaterial({ map: plywood(tw, th, handle), color: '#b98b5c', roughness: 0.78 });
   // Box faces: +x, −x, +y, −y, +z, −z. The hand holes are in the 12 × 20 sides.
   const side = mat(d, h, false);
   const front = mat(w, h, true);
@@ -750,7 +825,7 @@ export class Subject {
     if (group && this.members.length) {
       const spec = GROUP_POSES[s.groupPose];
       spec.members.forEach((m0, i) => {
-        const ms = this.onSofa && !isSeated(m0.pose) ? { ...m0, pose: 'seated' as const, x: Math.sign(m0.x) * 0.8, z: -0.02, yaw: -Math.sign(m0.x) * 6 } : m0;
+        const ms = this.onSofa && !isSeated(m0.pose) ? { ...m0, pose: 'seated' as const, x: Math.sign(m0.x) * 0.92, z: -0.02, yaw: -Math.sign(m0.x) * 6 } : m0;
         const { figure, holder } = this.members[i];
         holder.position.set(ms.x, 0, ms.z);
         holder.rotation.y = D(ms.yaw);
@@ -766,9 +841,14 @@ export class Subject {
     if (!seat) return 0.47;
     seat.updateMatrixWorld(true);
     const hip = figure.hipPoint();
-    this.ray.set(new THREE.Vector3(hip.x, 3, hip.z), new THREE.Vector3(0, -1, 0));
-    const hit = this.ray.intersectObject(seat, true)[0];
-    return hit ? hit.point.y : 0.47;
+    // Probe a small patch under the hips, so a gap between cushions or slats isn't taken for the seat.
+    let top = -Infinity;
+    for (const [dx, dz] of [[0, 0], [-0.09, 0], [0.09, 0], [0, 0.08], [-0.09, 0.08], [0.09, 0.08]]) {
+      this.ray.set(new THREE.Vector3(hip.x + dx, 3, hip.z + dz), new THREE.Vector3(0, -1, 0));
+      const hit = this.ray.intersectObject(seat, true)[0];
+      if (hit) top = Math.max(top, hit.point.y);
+    }
+    return top > -Infinity ? top : 0.47;
   }
 
   /** Where the lights aim and the camera focuses: the eyes, or the middle of the group's faces. */

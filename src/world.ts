@@ -625,8 +625,10 @@ export class World {
     this.picnicSet.visible = s.subject.picnic && outdoors;
     if (this.figure) {
       this.figure.root.visible = s.subject.backgroundFigure;
-      if (open) this.figure.root.position.set(1.2, 0, -4.5);
-      else this.figure.root.position.set(0.85, 0, Math.max(bgZ + 0.6, -2.6));
+      // x and z only: setPose has already set the height that puts the soles on the floor.
+      const p = this.figure.root.position;
+      if (open) p.set(1.2, p.y, -4.5);
+      else p.set(0.85, p.y, Math.max(bgZ + 0.6, -2.6));
     }
     this.lamps.visible = s.subject.bokehLights && open;
     // Street-lamp globes: ~8,000 cd/m².

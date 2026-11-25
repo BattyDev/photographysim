@@ -165,8 +165,10 @@ Helpers you must use, imported from './woodwork':
   // Plain wood material (for your own geometries, e.g. a sphere).
   woodMaterial(wood: Wood, length?: number): THREE.MeshStandardMaterial
 
-To paint a block, create it with `block(...)` and then set `mesh.material =
-paint('#e8dcc4', longestSide)`. For spheres, discs and other shapes, make a
+`block`, `post` and `legs` also accept a paint colour in place of the wood,
+as a '#rrggbb' string: `block('#e8dcc4', 2, 0.1, 2, 0, 0, 0)` is a cream-painted
+block. Keep the mannequins' pale maple for small accents only, so the figures
+stand out against the set. For spheres, discs and other shapes, make a
 THREE.Mesh with your own geometry and one of these materials.
 
 Palette (use nothing else): maple, walnut, and paints cream #e8dcc4,
