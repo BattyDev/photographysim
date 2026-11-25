@@ -262,7 +262,7 @@ export function defaultState(): SimState {
       people: 'solo',
       groupPose: 'standing',
       backgroundDistance: 2.5,
-      foregroundProp: true,
+      foregroundProp: false,
       backgroundFigure: false,
       backgroundProp: false,
       picnic: false,
@@ -451,7 +451,7 @@ export function fitLightsToGroup(s: SimState) {
 }
 
 const GROUP_STANDING: CameraView = { distance: 6.2, height: 1.4, azimuth: 0, targetHeight: 1.0 };
-const GROUP_SEATED: CameraView = { distance: 6.0, height: 1.25, azimuth: 0, targetHeight: 0.85 };
+const GROUP_SEATED: CameraView = { distance: 7.0, height: 1.25, azimuth: 0, targetHeight: 0.85 };
 
 /** Camera for a group, scaled to the lens so the family fills the frame. */
 export function groupView(s: SimState, k = 1): CameraView {
@@ -574,7 +574,7 @@ export const SCENARIO_PRESETS: Preset[] = [
   {
     id: 'window',
     label: 'Window light',
-    blurb: 'A real workshop window to the side and no strobes at all. Notice how fast the light falls off across the face and the room.',
+    blurb: 'A big window to the side and no strobes at all. Notice how fast the light falls off across the face and the room.',
     apply: (s) => {
       setLights(s, {});
       s.env = { ...s.env, inShade: false, mode: 'location', location: 'workshop', sunAzimuth: -70 };

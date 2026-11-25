@@ -34,7 +34,7 @@ panoramas still light every scene; they are no longer drawn.
           | bookshelf        tree (2.2,-2.6)|
           |    armchair (-2.15,-1.7)        |
      door |                                 | window
-  z -1..0 |      kids stand  ~z -0.66       | z = -1
+  z -1..0 |                                 | z = -1
           |  [======= sofa =======]  side   |
           |   x -1.05..1.05, z -0.69..0.21  | table (1.75,-0.35)
           |            subject (0,0)        |
@@ -84,7 +84,7 @@ panoramas still light every scene; they are no longer drawn.
 
 ```
      houses (pastel blocks, gabled roofs) at z -30 .. -45
-   trees ...  lollipop trees in clusters, z -8 .. -35 ...  trees
+   trees ...  carved trees in clusters, z -8 .. -35 ...  trees
      picket fence across at z -12, a gap where the path runs
             lamps (-4.2,-11) (4.8,-15) (-1.5,-22)
       bistro set (1.7,-7.5)     path: 1.5 m wide gravel strip
@@ -98,7 +98,7 @@ panoramas still light every scene; they are no longer drawn.
 - **Ground:** a disc 45 m in radius, grass paint, with low rounded mounds near
   the edge, so the horizon isn't a hard line.
 - **Path:** gravel, 1.5 m wide, along x = 0.3 from z +8 to −40, raised 4 mm.
-- **Trees:** "lollipop" trees made of a walnut trunk and a sphere or cone crown
+- **Trees:** carved toy trees: a walnut trunk under lumpy round crowns or stacked fir tiers
   in sage or grass paint, between 3 and 8 m tall. Put them in clusters from
   z −8 to −35 and out to the sides, never on the path.
 - **Fence:** a low maple picket fence across at z −12, with a gap for the path.

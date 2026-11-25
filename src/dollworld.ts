@@ -5,7 +5,7 @@
 // and the camera is on the +z side. The furniture the app places itself (sofa,
 // armchair, tables, picnic set, lamps, stump, boulder) is not built here.
 import * as THREE from 'three';
-import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { mergeGeometries, mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { block, post, group, paint, woodMaterial, PAINT, type Finish, type Wood } from './woodwork';
 
 const Y = new THREE.Vector3(0, 1, 0);
@@ -359,7 +359,7 @@ const PARK_KEEP: [number, number, number][] = [
   [6, -7.5, 1],
 ];
 
-/** Model-railway diorama: grass disc, gravel path, lollipop trees, a picket fence and toy houses. */
+/** Model-railway diorama: grass disc, gravel path, carved trees, a picket fence and toy houses. */
 export function buildPark(): THREE.Group {
   const R = 45;
   const ground = new THREE.Mesh(new THREE.CircleGeometry(R, 72).rotateX(-Math.PI / 2), surface(PAINT.grass, 2 * R, 2 * R, 3));
@@ -574,43 +574,189 @@ function fence(): THREE.Object3D[] {
   return [instanced(geo, paint(PAINT.cream), pickets), ...rails];
 }
 
-/** Five or six toy houses far behind: painted bodies, walnut gabled roofs, dark windows. */
+// ------------------------------------------------------------------ houses
+
+interface HouseSpec {
+  x: number;
+  z: number;
+  /** Width along the front, depth, and wall height up to the eaves. */
+  w: number;
+  d: number;
+  h: number;
+  /** Roof pitch (rad). */
+  pitch: number;
+  body: Finish;
+  trim: Finish;
+  door: Finish;
+  storeys: 1 | 2;
+  porch?: boolean;
+  shutters?: boolean;
+  chimney?: number;
+}
+
+/** Six toy houses: cottages and narrow two-storey houses, each a little different. */
+const HOUSES: HouseSpec[] = [
+  { x: -17.5, z: -35, w: 5.2, d: 4.2, h: 2.9, pitch: 0.62, body: PAINT.cream, trim: PAINT.sage, door: PAINT.sage, storeys: 1, porch: true, shutters: true, chimney: 0.3 },
+  { x: -10.5, z: -37.5, w: 4.2, d: 4.4, h: 5.4, pitch: 0.78, body: PAINT.blue, trim: PAINT.cream, door: PAINT.terracotta, storeys: 2, chimney: -0.25 },
+  { x: -3.5, z: -36, w: 6.4, d: 4.6, h: 3.1, pitch: 0.5, body: PAINT.terracotta, trim: PAINT.cream, door: PAINT.blue, storeys: 1, shutters: true, chimney: -0.32 },
+  { x: 4.2, z: -34.5, w: 4.8, d: 4.4, h: 5.1, pitch: 0.66, body: PAINT.sage, trim: PAINT.cream, door: PAINT.terracotta, storeys: 2, porch: true },
+  { x: 11.2, z: -37, w: 5, d: 4.2, h: 2.9, pitch: 0.7, body: PAINT.cream, trim: PAINT.blue, door: PAINT.blue, storeys: 1, shutters: true, chimney: 0.28 },
+  { x: 17.8, z: -35.5, w: 4.2, d: 4.4, h: 5.3, pitch: 0.74, body: PAINT.terracotta, trim: PAINT.cream, door: PAINT.sage, storeys: 2, chimney: 0.22 },
+];
+
+/** A plain box (12 triangles): for the many small details, where rounded edges wouldn't show at this distance. */
+function box(f: Finish, w: number, h: number, d: number, x: number, y: number, z: number): THREE.Mesh {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), baseMaterial(f));
+  m.position.set(x, y, z);
+  return m;
+}
+
+/**
+ * Join one house's parts into a single mesh per material, so a detailed
+ * house still draws in a handful of calls.
+ */
+function mergeByMaterial(parts: THREE.Mesh[]): THREE.Mesh[] {
+  const byMat = new Map<THREE.Material, THREE.BufferGeometry[]>();
+  for (const m of parts) {
+    m.updateMatrix();
+    let g = m.geometry.index ? m.geometry.toNonIndexed() : m.geometry.clone();
+    g = g.applyMatrix4(m.matrix);
+    for (const k of Object.keys(g.attributes)) if (!['position', 'normal', 'uv'].includes(k)) g.deleteAttribute(k);
+    const mat = m.material as THREE.Material;
+    if (!byMat.has(mat)) byMat.set(mat, []);
+    byMat.get(mat)!.push(g);
+  }
+  return [...byMat].map(([mat, geos]) => new THREE.Mesh(mergeGeometries(geos), mat));
+}
+
+/** A window on the front wall (z = face): trim frame with a cross, dark glass, a sill, and shutters if asked. */
+function frontWindow(s: HouseSpec, x: number, y: number, ww: number, wh: number, face: number): THREE.Mesh[] {
+  const t = 0.09;
+  const parts = [
+    box(PAINT.charcoal, ww, wh, 0.04, x, y, face + 0.01),
+    box(s.trim, ww + 2 * t, t, 0.07, x, y + wh / 2 + t / 2, face + 0.035),
+    box(s.trim, t, wh, 0.07, x - ww / 2 - t / 2, y, face + 0.035),
+    box(s.trim, t, wh, 0.07, x + ww / 2 + t / 2, y, face + 0.035),
+    box(s.trim, 0.05, wh, 0.05, x, y, face + 0.035),
+    box(s.trim, ww, 0.05, 0.05, x, y, face + 0.035),
+    box(s.trim, ww + 0.34, 0.08, 0.18, x, y - wh / 2 - 0.04, face + 0.07),
+  ];
+  if (s.shutters) for (const sx of [-1, 1]) parts.push(box(s.door, ww * 0.48, wh + 0.1, 0.05, x + sx * (ww / 2 + t + ww * 0.26), y, face + 0.03));
+  return parts;
+}
+
+/** One carved toy house: plinth, painted walls, shingled walnut roof, trimmed windows, door, porch and chimney. */
+function house(s: HouseSpec, r: () => number): THREE.Group {
+  const { w, d, h, pitch } = s;
+  const plinth = 0.32;
+  const rise = (d / 2) * Math.tan(pitch);
+  const face = d / 2;
+  const parts: THREE.Mesh[] = [];
+
+  // Plinth and walls.
+  parts.push(box(PAINT.stone, w + 0.14, plinth, d + 0.14, 0, plinth / 2, 0));
+  const walls = box(s.body, w, h - plinth, d, 0, plinth + (h - plinth) / 2, 0);
+  walls.material = surface(s.body, w, h, 2);
+  parts.push(walls);
+  // Gable ends: a triangular prism the colour of the walls.
+  const tri = new THREE.Shape([new THREE.Vector2(-d / 2, 0), new THREE.Vector2(d / 2, 0), new THREE.Vector2(0, rise)]);
+  const gable = new THREE.Mesh(new THREE.ExtrudeGeometry(tri, { depth: w, bevelEnabled: false }), walls.material);
+  gable.rotation.y = Math.PI / 2;
+  gable.position.set(-w / 2, h, 0);
+  parts.push(gable);
+  // Corner boards and an eaves band in the trim colour.
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) parts.push(box(s.trim, 0.12, h - plinth, 0.12, sx * (w / 2 - 0.04), plinth + (h - plinth) / 2, sz * (d / 2 - 0.04)));
+  for (const sz of [-1, 1]) parts.push(box(s.trim, w + 0.08, 0.14, 0.08, 0, h - 0.07, sz * (d / 2 + 0.02)));
+
+  // Roof: each slope is a walnut board with five rows of shingles stepped down it, overhanging the walls.
+  const over = 0.35;
+  const run = d / 2 + over;
+  const len = run / Math.cos(pitch);
+  const rows = 5;
+  for (const sz of [-1, 1]) {
+    const dir = new THREE.Vector3(0, -Math.sin(pitch), sz * Math.cos(pitch));
+    const normal = new THREE.Vector3(0, Math.cos(pitch), sz * Math.sin(pitch));
+    const ridge = new THREE.Vector3(0, h + rise + 0.02, 0);
+    const board = box('walnut', w + 0.6, 0.1, len, 0, 0, 0);
+    board.position.copy(ridge).addScaledVector(dir, len / 2).addScaledVector(normal, 0.05);
+    board.rotation.x = -sz * pitch;
+    parts.push(board);
+    for (let i = 0; i < rows; i++) {
+      const rl = len / rows + 0.08;
+      const sh = box('walnut', w + 0.62, 0.05, rl, 0, 0, 0);
+      sh.position.copy(ridge).addScaledVector(dir, (i + 0.5) * (len / rows) + 0.04).addScaledVector(normal, 0.118);
+      // Each row tips out a touch more than the slope: its lower edge stands proud over the next row, like a shingle course.
+      sh.rotation.x = -sz * (pitch + 0.03);
+      sh.material = woodMaterial('walnut', 1.2);
+      parts.push(sh);
+    }
+  }
+  const ridgeBeam = post('walnut', 0.09, 0.09, w + 0.66, 0, h + rise + 0.2, 0, 10);
+  ridgeBeam.rotation.z = Math.PI / 2;
+  parts.push(ridgeBeam);
+
+  // Chimney through the back slope.
+  if (s.chimney !== undefined) {
+    const cx = s.chimney * w;
+    const cz = -d / 4;
+    const top = h + rise + 0.7;
+    const base = h + rise * 0.3;
+    parts.push(box(PAINT.stone, 0.55, top - base, 0.55, cx, (top + base) / 2, cz), box(PAINT.charcoal, 0.68, 0.1, 0.68, cx, top + 0.05, cz));
+  }
+
+  // Door with a trim surround and a stone step, left of centre; optional porch roof on two posts.
+  const dx = -w * 0.22;
+  const dh = 2.05;
+  parts.push(
+    box(s.trim, 1.12, dh + 0.12, 0.06, dx, plinth + dh / 2 + 0.03, face + 0.03),
+    box(s.door, 0.9, dh, 0.06, dx, plinth + dh / 2, face + 0.05),
+    box(PAINT.charcoal, 0.08, 0.08, 0.05, dx + 0.3, plinth + 1.0, face + 0.1),
+    box(PAINT.stone, 1.4, plinth, 0.5, dx, plinth / 2, face + 0.25),
+  );
+  if (s.porch) {
+    const py = plinth + dh + 0.35;
+    const pr = box('walnut', 1.8, 0.08, 1.1, dx, py, face + 0.55);
+    pr.rotation.x = 0.25;
+    parts.push(pr);
+    for (const sx of [-1, 1]) parts.push(box(s.trim, 0.1, py - 0.05, 0.1, dx + sx * 0.78, (py - 0.05) / 2, face + 0.95));
+  }
+
+  // Windows: one row per storey, avoiding the door.
+  const ww = 0.85;
+  const wh = 1.1;
+  const slots = [w * 0.12, w * 0.3].filter((x) => Math.abs(x - dx) > 1.1);
+  const rowsY = s.storeys === 2 ? [plinth + 1.45, plinth + 1.45 + (h - plinth) / 2] : [plinth + 1.4];
+  rowsY.forEach((y, row) => {
+    const xs = row === 0 ? slots : [dx, ...slots];
+    for (const x of xs) parts.push(...frontWindow(s, x, y, ww, wh, face));
+  });
+  // A small window high in each gable end.
+  for (const sx of [-1, 1]) {
+    const gx = sx * (w / 2);
+    const gy = h + rise * 0.35;
+    parts.push(box(PAINT.charcoal, 0.04, 0.5, 0.5, gx, gy, 0), box(s.trim, 0.07, 0.62, 0.62, gx + sx * 0.01, gy, 0));
+    // The glass sits proud of the trim so it shows.
+    parts[parts.length - 2].position.x += sx * 0.03;
+  }
+
+  const g = new THREE.Group();
+  g.add(...mergeByMaterial(parts));
+  // A pair of carved bushes by the door.
+  for (const sx of [-1, 1]) {
+    const b = new THREE.Mesh(lumpGeometry(11 + sx), leafPaint(sx < 0 ? PAINT.grass : PAINT.sage));
+    const rr = 0.42 + r() * 0.12;
+    b.scale.set(rr, rr * 0.85, rr);
+    b.position.set(dx + sx * 1.1, rr * 0.7, face + 0.55);
+    b.rotation.y = r() * 6;
+    g.add(b);
+  }
+  g.position.set(s.x, 0, s.z);
+  g.rotation.y = (r() - 0.5) * 0.25;
+  return group(g);
+}
+
+/** The toy houses far behind the park, beyond the trees. */
 function houses(): THREE.Object3D[] {
   const r = rng(77);
-  const bodies: Finish[] = [PAINT.cream, PAINT.sage, PAINT.blue, PAINT.terracotta];
-  const out: THREE.Object3D[] = [];
-  [-17, -10, -3.5, 4, 11, 17.5].forEach((x, i) => {
-    const w = 4 + r() * 2;
-    const h = 3 + r() * 1.2;
-    const d = 4;
-    const z = -34 - r() * 4;
-    const pitch = 0.6;
-    const f = bodies[i % bodies.length];
-    const house = new THREE.Group();
-    house.position.set(x, 0, z);
-    house.rotation.y = (r() - 0.5) * 0.3;
-    // Gable: a triangular prism the same colour as the body.
-    const rise = (d / 2) * Math.tan(pitch);
-    const tri = new THREE.Shape([new THREE.Vector2(-d / 2, 0), new THREE.Vector2(d / 2, 0), new THREE.Vector2(0, rise)]);
-    const gable = new THREE.Mesh(new THREE.ExtrudeGeometry(tri, { depth: w, bevelEnabled: false }), paint(f, w));
-    gable.rotation.y = Math.PI / 2;
-    gable.position.set(-w / 2, h, 0);
-    const slopeLen = d / 2 / Math.cos(pitch) + 0.3;
-    const roof = [-1, 1].map((s) => {
-      const m = block('walnut', w + 0.4, 0.14, slopeLen, 0, h + rise / 2 + 0.05, (s * d) / 4 + s * 0.06, 0.03);
-      m.rotation.x = -s * pitch;
-      return m;
-    });
-    const front = d / 2 + 0.02;
-    house.add(
-      slab(f, w, h, d, 0, h / 2, 0, 0.05),
-      gable,
-      ...roof,
-      block(PAINT.charcoal, 0.8, 1.4, 0.05, -w / 4, 0.7, front, 0.02),
-      block(PAINT.charcoal, 0.8, 0.8, 0.05, w / 5, h * 0.55, front, 0.02),
-      block(PAINT.charcoal, 0.8, 0.8, 0.05, -w / 4, h * 0.8, front, 0.02),
-    );
-    out.push(group(house));
-  });
-  return out;
+  return HOUSES.map((s) => house(s, r));
 }

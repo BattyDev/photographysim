@@ -540,9 +540,11 @@ export const GROUP_POSES: Record<GroupPoseId, { label: string; members: MemberSp
     members: [
       { scale: 1, x: -0.42, z: -0.02, yaw: 4, pose: 'leaning' },
       { scale: 0.93, x: 0.42, z: -0.02, yaw: -4, pose: 'seated' },
-      // The children stand behind the seat, between and behind their parents.
-      { scale: 0.72, x: -0.86, z: -0.66, yaw: 10, pose: 'pockets' },
-      { scale: 0.58, x: 0.86, z: -0.64, yaw: -10, pose: 'standing' },
+      // The children stand at the ends of the seat, a step forward and turned
+      // in, each beside a parent: their heads and the seated parents' make one
+      // gentle line across the frame. (On the sofa they sit at the ends instead.)
+      { scale: 0.72, x: -0.98, z: 0.12, yaw: 16, pose: 'clasped' },
+      { scale: 0.58, x: 0.96, z: 0.14, yaw: -16, pose: 'standing' },
     ],
   },
 };

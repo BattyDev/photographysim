@@ -77,8 +77,8 @@ Built with Three.js + Vite + TypeScript. See [PLAN.md](PLAN.md) for the design b
     background stays sunny: open shade. The panoramas only light the scene;
     what you see is a wooden toy set built in code (`src/dollworld.ts`): an
     open-front dollhouse living room for the indoor locations, and a
-    model-railway park (grass, a gravel path, lollipop trees, a picket fence,
-    toy houses) under a sky painted from the panorama's own colours outdoors.
+    model-railway park (grass, a gravel path, carved trees, a picket fence,
+    shingled toy houses) under a sky painted from the panorama's own colours outdoors.
     Flash lights the set, it catches every light's shadow, and depth of field
     blurs it by its true distance.
 - **Quick starts**: 8 lighting setups (Rembrandt, loop, butterfly, clamshell,
