@@ -5,6 +5,7 @@
 // and the camera is on the +z side. The furniture the app places itself (sofa,
 // armchair, tables, picnic set, lamps, stump, boulder) is not built here.
 import * as THREE from 'three';
+import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { block, post, group, paint, woodMaterial, PAINT, type Finish, type Wood } from './woodwork';
 
 const Y = new THREE.Vector3(0, 1, 0);
@@ -390,7 +391,7 @@ export function buildPark(): THREE.Group {
   return g;
 }
 
-/** Lollipop trees in clusters behind the set and out to the sides, never on the path. */
+/** Carved toy trees in clusters behind the set and out to the sides, never on the path. */
 function trees(): THREE.Object3D[] {
   const r = rng(41);
   type Tree = { x: number; z: number; h: number; cr: number; cone: boolean };
@@ -424,21 +425,138 @@ function trees(): THREE.Object3D[] {
       out.every((t) => Math.hypot(x - t.x, z - t.z) > (t.cr + cr) * 0.75);
     if (ok) out.push({ x, z, h, cr, cone });
   }
+  // Each tree's parts go into shared instanced meshes, each copy turned and
+  // tinted a little differently so no two crowns look stamped out.
   const trunks: THREE.Matrix4[] = [];
-  const balls: [THREE.Matrix4[], THREE.Matrix4[]] = [[], []];
-  const cones: THREE.Matrix4[] = [];
+  const lumps: [THREE.Matrix4[], THREE.Matrix4[]] = [[], []];
+  const tiers: THREE.Matrix4[] = [];
   out.forEach((t, i) => {
-    const th = t.h * 0.42;
-    trunks.push(placed(t.x, th / 2, t.z, 0.05 + t.h * 0.018, th, 0.05 + t.h * 0.018));
-    if (t.cone) cones.push(placed(t.x, th + (t.h - th) / 2 - 0.1, t.z, t.cr, t.h - th + 0.2, t.cr));
-    else balls[i % 2].push(placed(t.x, t.h - t.cr, t.z, t.cr, t.cr * 1.05, t.cr));
+    const spin = r() * Math.PI * 2;
+    const w = 0.05 + t.h * 0.018;
+    if (t.cone) {
+      // Carved fir: three stacked tiers, each overlapping the one below; the trunk runs up inside them.
+      const base = t.h * 0.22;
+      const tierH = (t.h - base) * 0.5;
+      for (let k = 0; k < 3; k++) {
+        const s = t.cr * (1 - k * 0.27);
+        tiers.push(placed(t.x, base + k * tierH * 0.5, t.z, s, tierH * (1 - k * 0.12), s, spin + k * 1.3));
+      }
+      trunks.push(placed(t.x, 0, t.z, w, t.h * 0.7, w, spin));
+    } else {
+      // Rounded tree: one big lump on top and two smaller ones tucked into its sides; the trunk ends inside it.
+      const cy = t.h - t.cr;
+      const set = lumps[i % 2];
+      set.push(placed(t.x, cy, t.z, t.cr, t.cr * 0.95, t.cr, spin));
+      for (const side of [-1, 1]) {
+        const a = spin + side * 1.4;
+        const s = t.cr * (0.62 + r() * 0.1);
+        set.push(placed(t.x + Math.sin(a) * t.cr * 0.62, cy - t.cr * 0.3, t.z + Math.cos(a) * t.cr * 0.62, s, s * 0.9, s, r() * 6));
+      }
+      trunks.push(placed(t.x, 0, t.z, w, cy, w, spin));
+    }
   });
   return [
-    instanced(new THREE.CylinderGeometry(1, 1.15, 1, 12), woodMaterial('walnut', 3), trunks),
-    instanced(new THREE.SphereGeometry(1, 16, 12), paint(PAINT.sage, 3), balls[0]),
-    instanced(new THREE.SphereGeometry(1, 16, 12), paint(PAINT.grass, 3), balls[1]),
-    instanced(new THREE.ConeGeometry(1, 1, 14), paint(PAINT.sage, 3), cones),
+    tinted(instanced(trunkGeometry(), trunkWood(), trunks), r, 0.08),
+    tinted(instanced(lumpGeometry(3), leafPaint(PAINT.sage), lumps[0]), r, 0.1),
+    tinted(instanced(lumpGeometry(9), leafPaint(PAINT.grass), lumps[1]), r, 0.1),
+    tinted(instanced(tierGeometry(), leafPaint(PAINT.sage), tiers), r, 0.1),
   ];
+}
+
+/** Smooth bumpy noise on the unit sphere, about ±1. */
+function bumps(p: THREE.Vector3, seed: number): number {
+  return (
+    Math.sin(p.x * 2.3 + seed) * Math.sin(p.y * 2.9 + seed * 1.7) * Math.sin(p.z * 2.1 + seed * 0.6) +
+    0.5 * Math.sin(p.x * 5.1 + p.z * 3.7 + seed * 2.3) * Math.sin(p.y * 4.3 - seed)
+  );
+}
+
+/**
+ * Whittle a shape: weld its vertices so it shades smoothly, push them in and
+ * out by `amount` of bumpy noise (all three axes, or only sideways), and give
+ * it seamless UVs so the grain wraps it without a visible join.
+ */
+function carve(geo: THREE.BufferGeometry, amount: number, seed: number, sideways = false): THREE.BufferGeometry {
+  geo.deleteAttribute('uv');
+  geo.deleteAttribute('normal');
+  const g = mergeVertices(geo);
+  const pos = g.attributes.position;
+  const p = new THREE.Vector3();
+  const uv = new Float32Array(pos.count * 2);
+  for (let i = 0; i < pos.count; i++) {
+    p.fromBufferAttribute(pos, i);
+    const k = 1 + amount * bumps(p.clone().normalize(), seed);
+    if (sideways) pos.setXYZ(i, p.x * k, p.y, p.z * k);
+    else pos.setXYZ(i, p.x * k, p.y * k, p.z * k);
+    // Planar projection on a slant: no seam anywhere, gentle stretch on the far sides.
+    uv[i * 2] = (p.x + p.z) * 0.35 + 0.5;
+    uv[i * 2 + 1] = p.y * 0.5 + 0.5;
+  }
+  g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  g.computeVertexNormals();
+  return g;
+}
+
+/** A lumpy carved ball of radius ~1 for leaf crowns. */
+function lumpGeometry(seed: number): THREE.BufferGeometry {
+  return carve(new THREE.IcosahedronGeometry(1, 3), 0.09, seed);
+}
+
+/**
+ * One fir tier, base at y = 0 and tip at y = 1: a lathe profile with a
+ * rounded rim and slightly hollow flanks, like a carved toy tree.
+ */
+function tierGeometry(): THREE.BufferGeometry {
+  const profile = [
+    [0, 0],
+    [0.7, 0.01],
+    [0.96, 0.05],
+    [1, 0.1],
+    [0.82, 0.24],
+    [0.55, 0.5],
+    [0.28, 0.76],
+    [0.08, 0.95],
+    [0, 1],
+  ].map(([x, y]) => new THREE.Vector2(x, y));
+  return carve(new THREE.LatheGeometry(profile, 16), 0.06, 5, true);
+}
+
+/** Tapered trunk from y = 0 to y = 1, flared at the root. */
+function trunkGeometry(): THREE.BufferGeometry {
+  const profile = [
+    [0, 0],
+    [1.6, 0],
+    [1.15, 0.06],
+    [1, 0.2],
+    [0.75, 1],
+    [0, 1],
+  ].map(([x, y]) => new THREE.Vector2(x, y));
+  return carve(new THREE.LatheGeometry(profile, 10), 0.05, 2, true);
+}
+
+/** Walnut with its grain running up the trunk. */
+function trunkWood(): THREE.MeshStandardMaterial {
+  const m = woodMaterial('walnut').clone();
+  m.map = m.map!.clone();
+  m.map.rotation = Math.PI / 2;
+  m.map.repeat.set(2, 1);
+  return m;
+}
+
+/** Leaf paint with the maple grain showing through at a carved-toy scale. */
+function leafPaint(color: string): THREE.MeshStandardMaterial {
+  const m = paint(color).clone();
+  m.map = m.map!.clone();
+  m.map.repeat.set(2, 2);
+  m.roughness = 0.75;
+  return m;
+}
+
+/** Vary each copy's shade by up to ±`spread`, so neighbours read as separate pieces. */
+function tinted(m: THREE.InstancedMesh, r: () => number, spread: number): THREE.InstancedMesh {
+  const c = new THREE.Color();
+  for (let i = 0; i < m.count; i++) m.setColorAt(i, c.setScalar(1 + (r() * 2 - 1) * spread));
+  return m;
 }
 
 /** Low cream picket fence across the park, with a gap for the path. */
