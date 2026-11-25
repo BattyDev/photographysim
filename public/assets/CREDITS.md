@@ -10,38 +10,14 @@ All third-party assets in `public/assets/`. Everything is CC0 (public domain) ex
 
 > *Infinite, 3D Head Scan* by Lee Perry-Smith is licensed under a Creative Commons Attribution 3.0 Unported License. Based on a work at www.triplegangers.com.
 
-## MIT (keep this notice)
-
-The people are five avatars from the [Microsoft Rocketbox Avatar Library](https://github.com/microsoft/Microsoft-Rocketbox): Female_Adult_15 (solo), Male_Adult_08, Female_Adult_07, Male_Child_01 and Female_Child_01 (the family). Converted from FBX to GLB in Blender with WebP textures at 1–2k. Files: `models/rocketbox/*.glb`.
-
-> MIT License
->
-> Copyright (c) 2020 Microsoft
->
-> Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
->
-> The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
->
-> THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+The furniture and outdoor props (bench, sofa, armchair, tables, picnic table, bistro set, potted tree, stump, boulder, street lamps) are built in code in `src/woodwork.ts`, in maple and walnut to match the mannequin. No outside assets.
 
 ## CC0 (no attribution required, credited anyway)
 
 | Asset | Source | Files |
 |---|---|---|
-| Stylized wooden mannequin (rigged) | [Grab3D](https://grab3d.com/models/characters/stylized-mannequin/). The license notes it is AI-assisted (Meshy) and cleaned up in Blender. Not shown: it is the invisible pose driver for the people. | `models/mannequin.glb` |
+| Stylized wooden mannequin (rigged) | [Grab3D](https://grab3d.com/models/characters/stylized-mannequin/). The license notes it is AI-assisted (Meshy) and cleaned up in Blender. Reduced in Blender to about 16k triangles with 1k WebP textures (from 268k and 2k). Used for the solo subject, the family (at four sizes) and the second person. | `models/mannequin.glb` |
 | Marble Bust 01 | [Poly Haven](https://polyhaven.com/a/marble_bust_01) | `models/polyhaven/marble_bust_01/` |
-| Potted Plant 02 | [Poly Haven](https://polyhaven.com/a/potted_plant_02) | `models/polyhaven/potted_plant_02/` |
-| Street Lamp 01 | [Poly Haven](https://polyhaven.com/a/street_lamp_01) | `models/polyhaven/street_lamp_01/` |
-| Painted Wooden Bench | [Poly Haven](https://polyhaven.com/a/painted_wooden_bench) | `models/polyhaven/painted_wooden_bench/` |
-| Tree Stump 01 | [Poly Haven](https://polyhaven.com/a/tree_stump_01) | `models/polyhaven/tree_stump_01/` |
-| Boulder 01 | [Poly Haven](https://polyhaven.com/a/boulder_01) | `models/polyhaven/boulder_01/` |
-| Sofa 03 | [Poly Haven](https://polyhaven.com/a/sofa_03) | `models/polyhaven/sofa_03/` |
-| Mid Century Lounge Chair | [Poly Haven](https://polyhaven.com/a/mid_century_lounge_chair) | `models/polyhaven/mid_century_lounge_chair/` |
-| Coffee Table Round 01 | [Poly Haven](https://polyhaven.com/a/coffee_table_round_01) | `models/polyhaven/coffee_table_round_01/` |
-| Side Table 01 | [Poly Haven](https://polyhaven.com/a/side_table_01) | `models/polyhaven/side_table_01/` |
-| Pachira Aquatica 01 | [Poly Haven](https://polyhaven.com/a/pachira_aquatica_01) | `models/polyhaven/pachira_aquatica_01/` |
-| Wooden Picnic Table | [Poly Haven](https://polyhaven.com/a/wooden_picnic_table) | `models/polyhaven/wooden_picnic_table/` |
-| Outdoor Table Chair Set 01 | [Poly Haven](https://polyhaven.com/a/outdoor_table_chair_set_01) | `models/polyhaven/outdoor_table_chair_set_01/` |
 | Photo Studio Loft Hall HDRI | [Poly Haven](https://polyhaven.com/a/photo_studio_loft_hall) | `hdri/photo_studio_loft_hall_2k.hdr` |
 | Artist Workshop HDRI | [Poly Haven](https://polyhaven.com/a/artist_workshop) | `hdri/artist_workshop_2k.hdr` |
 | Meadow 2 HDRI | [Poly Haven](https://polyhaven.com/a/meadow_2) | `hdri/meadow_2_2k.hdr` |

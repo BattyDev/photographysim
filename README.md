@@ -30,18 +30,16 @@ Built with Three.js + Vite + TypeScript. See [PLAN.md](PLAN.md) for the design b
   casual, or seated (on apple boxes in the studio, a park bench outdoors, the
   sofa in the living room, where the children sit too).
 - **Subject & scene**: three ready-made subjects:
-  - a real-looking person (Microsoft Rocketbox avatars) with 15 poses. Several
+  - a wooden posing mannequin with 15 poses. Several
     are there to show light off: three-quarter (short vs broad), profile (split),
     over the shoulder (rim), chin up (butterfly), hand to chin (hand shadows),
     hand in hair (light along the raised arm). The rest are everyday portrait
     poses: relaxed, hand on hip, arms crossed, hands clasped, hands in pockets,
     looking away, walking, seated, and seated leaning in. Standing poses put
     the weight on one leg (contrapposto), with the hips and shoulders tilted
-    against each other, and the fingers curl as a relaxed hand does.
-    The family is a father, mother, son and daughter, each in a different pose
-    within a group layout. Poses are set on an
-    invisible rigged mannequin and copied joint by joint onto each person's
-    skeleton (`src/person.ts`), so one set of poses drives everyone.
+    against each other. The family is the same mannequin at four sizes
+    (father, mother, son and daughter), each in a different pose within a
+    group layout.
   - a scanned human head, for studying light patterns on a real face
   - a marble bust
 
@@ -50,8 +48,9 @@ Built with Three.js + Vite + TypeScript. See [PLAN.md](PLAN.md) for the design b
   indoors, a tree stump outdoors), a boulder a few metres behind (outdoors),
   picnic tables at about 4 m and 8 m behind (outdoors), a second person,
   string lights and street lamps for bokeh. The living room comes furnished:
-  sofa, mid-century armchair, round coffee table, side table and a potted
-  money tree, at near, middle and far distances. Subject-to-backdrop
+  sofa, armchair, round coffee table, side table and a potted tree, at near,
+  middle and far distances. All furniture and props are simple wooden models
+  built in code (`src/woodwork.ts`), in the mannequin's maple and walnut. Subject-to-backdrop
   distance.
 - **Environments**:
   - **Studio**: a seamless paper backdrop as it stands in a real studio: a
@@ -139,7 +138,7 @@ Pushing to `main` deploys to GitHub Pages via `.github/workflows/pages.yml`.
 | `src/hdri.ts` | HDRI locations: sun extraction, lux calibration, metering grid, room measurements |
 | `src/projection.ts` | Panorama projected onto relightable proxy surfaces, with the sharp detail layer |
 | `src/subject.ts` | Bone poses (on the mannequin), family group poses and seats, head scan, bust |
-| `src/person.ts` | Rocketbox people, posed by copying the mannequin's joint turns onto their skeletons |
+| `src/woodwork.ts` | Wooden furniture and props built from boxes and cylinders, maple and walnut to match the mannequin |
 | `src/assets.ts` | glTF / texture / HDR loading helpers |
 | `src/pipeline.ts` | HDR render → thin-lens bokeh → white balance → tone map |
 | `src/diagram.ts` | Top-down lighting diagram |

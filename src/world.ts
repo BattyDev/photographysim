@@ -1,12 +1,11 @@
 // Studio, open-sky and HDRI-location environments, the daylight model, and depth props.
 import * as THREE from 'three';
-import { placedModel } from './assets';
 import { Backdrop, MAX_BACKDROP_DISTANCE, paperWidth } from './backdrop';
 import { HdriLibrary, locationSpec, type HdriData } from './hdri';
 import { kelvinToRGB, srgbToLinear } from './photo';
 import type { LocationId, SimState, Weather } from './state';
-import { loadPerson } from './person';
-import type { Poseable } from './subject';
+import { loadFigure, type Poseable } from './subject';
+import * as wood from './woodwork';
 
 /** Exposure context shared by everything that emits or reflects light. */
 export interface Exposure {
@@ -330,12 +329,12 @@ export class World {
     load().then(() => this.onAssetLoaded());
   }
 
-  /** A Poly Haven prop at its real size (or scaled to `height`), turned by `rot`. */
-  private loadProp(file: string, into: THREE.Group, rot: number, height?: number) {
-    return placedModel(`models/polyhaven/${file}`, height).then((m) => {
-      m.rotation.y = rot;
-      into.add(m);
-    });
+  /** A wooden prop (see woodwork.ts), turned by `rot`. */
+  private loadProp(make: () => THREE.Object3D, into: THREE.Group, rot: number) {
+    const m = make();
+    m.rotation.y = rot;
+    into.add(m);
+    return Promise.resolve();
   }
 
   /** Furniture for the living room, laid out at near, middle and far distances. */
@@ -345,41 +344,34 @@ export class World {
       m.rotation.y = rot;
       this.livingSet.add(m);
     };
-    const P = 'models/polyhaven/';
-    return Promise.all([
-      placedModel(`${P}mid_century_lounge_chair/mid_century_lounge_chair_1k.gltf`).then((m) => at(m, -2.15, -1.7, 0.7)),
-      placedModel(`${P}side_table_01/side_table_01_1k.gltf`).then((m) => at(m, 1.75, -0.35, 0)),
-      placedModel(`${P}coffee_table_round_01/coffee_table_round_01_1k.gltf`).then((m) => at(m, 1.55, 1.6, 0.3)),
-      placedModel(`${P}pachira_aquatica_01/pachira_aquatica_01_1k.gltf`, 1.7, (n) => n.endsWith('_b')).then((m) => at(m, 2.2, -2.6, 0.4)),
-    ]);
+    at(wood.armchair(), -2.15, -1.7, 0.7);
+    at(wood.sideTable(), 1.75, -0.35, 0);
+    at(wood.coffeeTable(), 1.55, 1.6, 0.3);
+    at(wood.pottedTree(1.7), 2.2, -2.6, 0.4);
+    return Promise.resolve();
   }
 
   /** A picnic table a few metres behind the subject and a bistro set far behind. */
   private loadPicnic() {
-    const P = 'models/polyhaven/';
-    return Promise.all([
-      placedModel(`${P}wooden_picnic_table/wooden_picnic_table_1k.gltf`).then((m) => {
-        m.position.set(-1.5, 0, -3.3);
-        m.rotation.y = 0.35;
-        this.picnicSet.add(m);
-      }),
-      placedModel(`${P}outdoor_table_chair_set_01/outdoor_table_chair_set_01_1k.gltf`).then((m) => {
-        m.position.set(1.7, 0, -7.5);
-        m.rotation.y = -0.5;
-        this.picnicSet.add(m);
-      }),
-    ]);
+    const table = wood.picnicTable();
+    table.position.set(-1.5, 0, -3.3);
+    table.rotation.y = 0.35;
+    const bistro = wood.bistroSet();
+    bistro.position.set(1.7, 0, -7.5);
+    bistro.rotation.y = -0.5;
+    this.picnicSet.add(table, bistro);
+    return Promise.resolve();
   }
 
   private loadPlant() {
-    return placedModel('models/polyhaven/potted_plant_02/potted_plant_02_1k.gltf', 1.25).then((plant) => {
-      plant.rotation.y = 0.6;
-      this.plant.add(plant);
-    });
+    const plant = wood.pottedTree(1.25);
+    plant.rotation.y = 0.6;
+    this.plant.add(plant);
+    return Promise.resolve();
   }
 
   private loadBackgroundFigure() {
-    return loadPerson('male_adult_08').then((f) => {
+    return loadFigure().then((f) => {
       f.setPose('crossed');
       f.root.rotation.y = THREE.MathUtils.degToRad(-25);
       this.figure = f;
@@ -391,7 +383,7 @@ export class World {
     const spots = [[-4.2, -11, 0.4], [4.8, -15, -0.3], [-1.5, -22, 0.2]] as const;
     return Promise.all(
       spots.map(([x, z, ry]) =>
-        placedModel('models/polyhaven/street_lamp_01/street_lamp_01_1k.gltf').then((lamp) => {
+        Promise.resolve(wood.streetLamp()).then((lamp) => {
           lamp.position.set(x, 0, z);
           lamp.rotation.y = ry;
           lamp.traverse((o) => {
@@ -486,11 +478,11 @@ export class World {
     if (!want) this.showPlace(null);
     const outdoors = mode === 'location' && locationSpec(s.env.location).proxy.kind === 'open';
     if (s.subject.foregroundProp && !outdoors) this.need('plant', () => this.loadPlant());
-    if (s.subject.foregroundProp && outdoors) this.need('stump', () => this.loadProp('tree_stump_01/tree_stump_01_1k.gltf', this.stump, 0.9));
+    if (s.subject.foregroundProp && outdoors) this.need('stump', () => this.loadProp(wood.stump, this.stump, 0.9));
     const home = mode === 'location' && s.env.location === 'living_room';
     if (home) this.need('living', () => this.loadLivingSet());
     if (s.subject.picnic && outdoors) this.need('picnic', () => this.loadPicnic());
-    if (s.subject.backgroundProp && outdoors) this.need('boulder', () => this.loadProp('boulder_01/boulder_01_1k.gltf', this.boulder, -0.5, 1.1));
+    if (s.subject.backgroundProp && outdoors) this.need('boulder', () => this.loadProp(wood.boulder, this.boulder, -0.5));
     this.shadeCaster.visible = false;
     if (s.subject.backgroundFigure) this.need('figure', () => this.loadBackgroundFigure());
     if (s.subject.bokehLights && mode !== 'studio') this.need('lamps', () => this.loadLamps());

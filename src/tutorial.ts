@@ -126,7 +126,7 @@ ${tip('on an outdoor shoot, try Tungsten for a blue, moody look.')}`,
     title: 'Subject',
     page: 'subject',
     target: pageBody,
-    body: `<p>Choose who you're photographing: a person, a scanned real face (best for studying light on skin), or a marble bust.</p>
+    body: `<p>Choose who you're photographing: a wooden mannequin, a scanned real face (best for studying light on skin), or a marble bust.</p>
 <p><strong>Turn</strong> angles them toward or away from the key. In the studio, <strong>Subject to backdrop</strong> controls how dark and blurred the paper gets. <strong>Depth props</strong> add things in front and behind to show off depth of field.</p>`,
   },
   {

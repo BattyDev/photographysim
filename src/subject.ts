@@ -7,7 +7,7 @@
 import * as THREE from 'three';
 import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { loadGLTF, loadTexture, placedModel, prepareModel } from './assets';
-import { loadPerson, type PersonId } from './person';
+import { bench, sofa } from './woodwork';
 import { isSeated, type GroupPoseId, type PoseId, type SubjectState } from './state';
 
 const D = THREE.MathUtils.degToRad;
@@ -305,22 +305,12 @@ const POSES: Record<PoseId, BoneTurn[]> = {
   ],
 };
 
-/** How far the fingers curl in each pose (1 = gently relaxed). The mannequin has no fingers; the people do. */
-export const HAND_CURL: Partial<Record<PoseId, number>> = {
-  clasped: 1.6,
-  pockets: 1.3,
-  crossed: 1.4,
-  hip: 0.6,
-  hair: 0.85,
-  leaning: 1.4,
-};
-
 // Dev only: lets poses be tried live from the console (window.__poses).
 if (import.meta.env.DEV) (window as unknown as { __poses: typeof POSES }).__poses = POSES;
 
 const AXES = { x: new THREE.Vector3(1, 0, 0), y: new THREE.Vector3(0, 1, 0), z: new THREE.Vector3(0, 0, 1) };
 
-/** Anything that takes the poses: the mannequin, or a person driven by it. */
+/** Anything that takes the poses (the mannequin). */
 export interface Poseable {
   readonly root: THREE.Object3D;
   setPose(id: PoseId, scale?: number, seatY?: number): void;
@@ -438,11 +428,6 @@ export async function loadFigure(): Promise<Figure> {
   const gltf = await loadGLTF('models/mannequin.glb');
   return new Figure(gltf.scene);
 }
-
-/** The family, in GROUP_POSES member order: father, mother, older and younger child. */
-const FAMILY: PersonId[] = ['male_adult_08', 'female_adult_07', 'male_child_01', 'female_child_01'];
-/** The person for solo portraits. */
-const SOLO: PersonId = 'female_adult_15';
 
 // ------------------------------------------------------------------ group
 
@@ -657,24 +642,22 @@ const SEATS: Record<SeatId, (loaded: () => void) => THREE.Group> = {
     }
     return g;
   },
-  // Outdoors the family sits on a real park bench (Poly Haven, CC0).
+  // Outdoors the family sits on a wooden park bench (woodwork.ts).
   bench: (loaded) => {
     const g = new THREE.Group();
-    placedModel('models/polyhaven/painted_wooden_bench/painted_wooden_bench_1k.gltf').then((m) => {
-      m.position.z = -0.12;
-      g.add(m);
-      loaded();
-    });
+    const m = bench();
+    m.position.z = -0.12;
+    g.add(m);
+    queueMicrotask(loaded);
     return g;
   },
-  // At home the family sits on a three-seat sofa (Poly Haven, CC0).
+  // At home the family sits on a wooden three-seat sofa.
   sofa: (loaded) => {
     const g = new THREE.Group();
-    placedModel('models/polyhaven/sofa_03/sofa_03_1k.gltf').then((m) => {
-      m.position.z = SOFA_Z;
-      g.add(m);
-      loaded();
-    });
+    const m = sofa();
+    m.position.z = SOFA_Z;
+    g.add(m);
+    queueMicrotask(loaded);
     return g;
   },
 };
@@ -721,7 +704,7 @@ export class Subject {
     // Fetch what this view needs.
     if (model === 'mannequin' && !group) {
       this.need('solo', () =>
-        loadPerson(SOLO).then((f) => {
+        loadFigure().then((f) => {
           this.solo = f;
           this.group.add(f.root);
         }),
@@ -729,7 +712,8 @@ export class Subject {
     }
     if (group) {
       this.need('group', async () => {
-        const people = await Promise.all(FAMILY.map((id) => loadPerson(id)));
+        // Father, mother, older and younger child: the same mannequin at four sizes.
+        const people = await Promise.all([0, 1, 2, 3].map(() => loadFigure()));
         for (const figure of people) {
           const holder = new THREE.Group();
           holder.add(figure.root);

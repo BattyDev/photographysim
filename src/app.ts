@@ -1139,7 +1139,7 @@ export class App {
       const modelPick = P.segmented(sec, {
         label: 'Subject',
         options: [
-          { value: 'mannequin', label: 'Person', title: 'A real-looking person who takes every pose' },
+          { value: 'mannequin', label: 'Mannequin', title: 'A wooden posing mannequin that takes every pose' },
           { value: 'headscan', label: 'Head scan', title: 'A real scanned face, for studying light patterns' },
           { value: 'bust', label: 'Marble bust', title: 'Classic sculpture on a plinth' },
         ],
@@ -1331,7 +1331,6 @@ export class App {
       const credits = P.el('div', 'hint credits');
       credits.innerHTML =
         'Models &amp; HDRIs: Poly Haven, Grab3D (CC0). ' +
-        'People: <a href="https://github.com/microsoft/Microsoft-Rocketbox" target="_blank" rel="noopener">Microsoft Rocketbox</a> (MIT). ' +
         '<em>Infinite, 3D Head Scan</em> by Lee Perry-Smith, ' +
         '<a href="https://creativecommons.org/licenses/by/3.0/" target="_blank" rel="noopener">CC BY 3.0</a>, ' +
         'based on a work at www.triplegangers.com.';
