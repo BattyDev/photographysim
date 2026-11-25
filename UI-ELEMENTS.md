@@ -183,6 +183,7 @@ The last page opened is saved in `localStorage` (`photographysim.page`) and reop
 - **Group "White balance"**:
   - **Camera white balance**: Kelvin-track slider from 2500 to 10000 K, ticks 3200 · 5600 · 7500 K.
   - 5 chips (`.cols-5.small`): Tungsten (3200 K), Fluoro (4000 K), Daylight (5600 K), Cloudy (6500 K), Shade (7500 K). The matching chip is `.active`.
+- **Reset camera settings**: single chip under white balance. Lens, aperture, focus, exposure and white balance are remembered between visits (localStorage); this puts them back to 85 mm, f/2.8, auto exposure, ISO 100, 5600 K with autofocus on the eyes, keeping the framing.
 
 ### 5.4 Subject page (person icon)
 - **Subject**: segmented control with Mannequin, Head scan, Marble bust. Each option has a tooltip. Solo only (the group is always the family of four mannequins). Poses are in Quick starts.
@@ -225,6 +226,7 @@ The last page opened is saved in `localStorage` (`photographysim.page`) and reop
 - **Show stands & modifiers**: toggle.
 - **Show top-view diagram**: toggle.
 - **Reset everything**: single `.chip` button.
+- **Export setup / Import setup**: two `.chip` buttons. Export downloads `photographysim-setup-<date>.json` with the whole state (lights, camera, subject, scene, overlays), the camera place as a preset `CameraView` (distance, height, azimuth, target height) and the shoot it started from. Import opens a file picker and loads such a file over the defaults, ignoring unknown or wrongly typed settings. Meant for sending setups to the developer to turn into built-in presets.
 - **Credits**: `.hint.credits`. Small text crediting the models and HDRIs, with a CC BY 3.0 link for the head scan. This attribution is required, so keep it visible in any restyle.
 
 ---

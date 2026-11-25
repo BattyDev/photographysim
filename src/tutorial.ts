@@ -140,7 +140,8 @@ ${tip('on an outdoor shoot, try Tungsten for a blue, moody look.')}`,
     title: 'View',
     page: 'view',
     target: pageBody,
-    body: `<p>Show or hide the light stands and the top view, start over with <strong>Reset everything</strong>, and see the credits for the models and places.</p>`,
+    body: `<p>Show or hide the light stands and the top view, start over with <strong>Reset everything</strong>, and see the credits for the models and places.</p>
+<p><strong>Export setup</strong> saves everything (lights, camera, subject, scene and where the camera stands) as a small file. Made a look you love? Export it and send the file over, and it can become a built-in preset. <strong>Import setup</strong> loads a file back in.</p>`,
   },
   {
     title: 'Save your photo',

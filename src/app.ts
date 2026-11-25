@@ -37,6 +37,7 @@ import {
   defaultState,
   fitLightsToGroup,
   groupView,
+  type CameraState,
   type CameraView,
   type LightId,
   type LightState,
@@ -90,8 +91,39 @@ const WB_PRESETS = [
   { label: 'Shade', k: 7500 },
 ];
 
+/** Marks a setup file as one of ours. */
+const SETUP_APP = 'photographysim';
+
+/**
+ * Copy `raw` over `base`, keeping only keys `base` already has with the same
+ * type. Arrays of objects with an `id` (the lights) match items by id.
+ */
+function mergeKnown(base: unknown, raw: unknown): unknown {
+  if (Array.isArray(base)) {
+    if (!Array.isArray(raw)) return base;
+    return base.map((item) => {
+      const id = (item as { id?: unknown })?.id;
+      const match = id === undefined ? undefined : raw.find((r) => (r as { id?: unknown })?.id === id);
+      return match === undefined ? item : mergeKnown(item, match);
+    });
+  }
+  if (base && typeof base === 'object') {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return base;
+    const out: Record<string, unknown> = { ...(base as Record<string, unknown>) };
+    for (const k of Object.keys(out)) if (k in (raw as object)) out[k] = mergeKnown(out[k], (raw as Record<string, unknown>)[k]);
+    return out;
+  }
+  if (typeof raw !== typeof base) return base;
+  return typeof raw === 'number' && !Number.isFinite(raw) ? base : raw;
+}
+
+/** Where the camera settings (lens, focus, exposure, white balance) are kept between visits. */
+const CAMERA_KEY = 'photographysim.camera';
+
 export class App {
   state: SimState = defaultState();
+  /** The camera settings as last saved, to skip writing when nothing changed. */
+  private savedCamera = '';
   private renderer: THREE.WebGLRenderer;
   private scene = new THREE.Scene();
   private overlay = new THREE.Scene();
@@ -203,7 +235,10 @@ export class App {
     new ResizeObserver(() => this.resize()).observe(this.viewport);
     this.resize();
     // Start on the outdoor solo shoot: only its panorama and one person download up front.
+    // Read the camera settings from the last visit before the opening shoot saves its own over them.
+    const saved = this.loadCamera();
     this.applyPreset(SHOOT_PRESETS[0]);
+    if (saved) this.setCameraSettings(saved);
     this.loop();
   }
 
@@ -226,6 +261,7 @@ export class App {
   /** Push the whole state into the scene and refresh the UI. */
   update() {
     const s = this.state;
+    this.saveCamera();
     const loc = s.env.mode === 'location' ? s.env.location : null;
     // The seat matches the wooden set: apple boxes in the studio, the bench in the park, the sofa in the dollhouse.
     const kind = loc ? locationSpec(loc).kind : s.env.mode === 'outdoor' ? 'open' : 'studio';
@@ -312,6 +348,44 @@ export class App {
   }
 
   // -------------------------------------------------------------- camera
+
+  /** Camera settings saved on an earlier visit, keeping only known keys with the right type. */
+  private loadCamera(): CameraState | null {
+    try {
+      const raw = JSON.parse(localStorage.getItem(CAMERA_KEY) ?? 'null') as Record<string, unknown> | null;
+      if (!raw || typeof raw !== 'object') return null;
+      const out = { ...defaultState().camera } as Record<string, unknown>;
+      for (const k of Object.keys(out)) if (typeof raw[k] === typeof out[k]) out[k] = raw[k];
+      return out as unknown as CameraState;
+    } catch {
+      return null;
+    }
+  }
+
+  private saveCamera() {
+    const json = JSON.stringify(this.state.camera);
+    if (json === this.savedCamera) return;
+    this.savedCamera = json;
+    try {
+      localStorage.setItem(CAMERA_KEY, json);
+    } catch {
+      // Storage full or blocked (private mode): settings just won't carry over.
+    }
+  }
+
+  /**
+   * Switch to other camera settings. The camera moves along its line of sight
+   * by the change in focal length, so the subject stays framed the same.
+   */
+  private setCameraSettings(next: CameraState) {
+    const k = next.focalLength / this.state.camera.focalLength;
+    const t = this.orbit.target;
+    this.camera.position.sub(t).multiplyScalar(k).add(t);
+    this.orbit.update();
+    this.state.camera = { ...next };
+    this.updateFocus();
+    this.update();
+  }
 
   private applyView(v: CameraView) {
     this.framing = this.angle = null;
@@ -631,6 +705,71 @@ export class App {
     e.preventDefault();
     this.update();
     if (msg) this.toastMsg(msg);
+  }
+
+  // ------------------------------------------------------------ setup files
+
+  /** Download the whole setup, with the camera's place, as a small JSON file. */
+  private exportSetup() {
+    const t = this.orbit.target;
+    const p = this.camera.position;
+    const flat = Math.hypot(p.x - t.x, p.z - t.z);
+    const round = (v: number) => Math.round(v * 1000) / 1000;
+    const file = {
+      app: SETUP_APP,
+      version: 1,
+      saved: new Date().toISOString(),
+      shoot: this.currentShoot?.label ?? null,
+      // The same numbers a preset uses (CameraView), around a subject at the origin.
+      view: {
+        distance: round(flat),
+        height: round(p.y),
+        azimuth: round((Math.atan2(p.x - t.x, p.z - t.z) * 180) / Math.PI),
+        targetHeight: round(t.y),
+      },
+      state: this.state,
+    };
+    const blob = new Blob([JSON.stringify(file, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `photographysim-setup-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    this.toastMsg('Setup exported');
+  }
+
+  /** Pick a setup file and load it. */
+  private importSetup() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json,application/json';
+    input.addEventListener('change', async () => {
+      const f = input.files?.[0];
+      if (!f) return;
+      try {
+        this.loadSetup(JSON.parse(await f.text()));
+        this.toastMsg(`Loaded ${f.name}`);
+      } catch {
+        this.toastMsg("That file isn't a setup from this simulator");
+      }
+    });
+    input.click();
+  }
+
+  /** Apply a parsed setup file over the defaults, keeping only known settings of the right type. */
+  private loadSetup(file: unknown) {
+    const f = file as { app?: unknown; state?: unknown; view?: Partial<CameraView> };
+    if (!f || f.app !== SETUP_APP || !f.state || typeof f.state !== 'object') throw new Error('not a setup');
+    const next = mergeKnown(defaultState(), f.state) as SimState;
+    // Settle the state first, then put the camera where the file says.
+    Object.assign(this.state, next);
+    this.currentShoot = null;
+    this.gizmoActive = false;
+    this.presetNote = '<strong>Imported setup.</strong> Loaded from a file.';
+    const v = f.view;
+    const ok = v && (['distance', 'height', 'azimuth', 'targetHeight'] as const).every((k) => typeof v[k] === 'number' && Number.isFinite(v[k]));
+    this.applyView(ok ? (v as CameraView) : FRAMINGS[1].view);
+    this.update();
   }
 
   // ------------------------------------------------------------ presets
@@ -1133,6 +1272,14 @@ export class App {
         })),
         'cols-5 small',
       );
+      // Camera settings are remembered between visits; this puts them back to the defaults.
+      P.buttons(sec, [
+        {
+          label: 'Reset camera settings',
+          title: '85 mm, f/2.8, auto exposure, ISO 100, 5600 K, focus on the eyes',
+          onClick: () => this.setCameraSettings(defaultState().camera),
+        },
+      ]);
     }
 
     // Subject & scene
@@ -1326,10 +1473,15 @@ export class App {
 
     // View
     {
-      const sec = page('view', 'View', 'Overlays, reset and credits.');
+      const sec = page('view', 'View', 'Overlays, reset, setup files and credits.');
       P.toggle(sec, { label: 'Show stands & modifiers', get: () => s().view.showGear, set: (v) => (s().view.showGear = v) });
       P.toggle(sec, { label: 'Show top-view diagram', get: () => s().view.showDiagram, set: (v) => (s().view.showDiagram = v) });
       P.buttons(sec, [{ label: 'Reset everything', onClick: () => this.applyPreset(SCENARIO_PRESETS[0]) }]);
+      // Save the whole setup (lights, camera, subject, scene and view) to a file, or load one back.
+      P.buttons(sec, [
+        { label: 'Export setup', title: 'Download this setup as a .json file, to keep or to send', onClick: () => this.exportSetup() },
+        { label: 'Import setup', title: 'Load a setup from a .json file', onClick: () => this.importSetup() },
+      ]);
       const credits = P.el('div', 'hint credits');
       credits.innerHTML =
         'Models &amp; HDRIs: Poly Haven, Grab3D (CC0). ' +
