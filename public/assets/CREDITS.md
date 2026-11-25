@@ -31,4 +31,3 @@ The furniture and outdoor props (bench, sofa, armchair, tables, picnic table, bi
 | Forest Slope HDRI | [Poly Haven](https://polyhaven.com/a/forest_slope) | `hdri/forest_slope_2k.hdr` |
 | Cobblestone Street Night HDRI | [Poly Haven](https://polyhaven.com/a/cobblestone_street_night) | `hdri/cobblestone_street_night_2k.hdr` |
 | Lythwood Lounge HDRI | [Poly Haven](https://polyhaven.com/a/lythwood_lounge) | `hdri/lythwood_lounge_2k.hdr` |
-| Detail layers for all thirteen HDRIs | Poly Haven's full-size tonemapped JPGs of the same panoramas, re-encoded at 8192×4096 (q80) and 4096×2048 (q84) | `hdri/detail/<location>_8k.jpg`, `hdri/detail/<location>_4k.jpg` |

@@ -227,7 +227,9 @@ export class App {
   update() {
     const s = this.state;
     const loc = s.env.mode === 'location' ? s.env.location : null;
-    this.subject.apply(s.subject, !loc ? 'studio' : locationSpec(loc).proxy.kind === 'open' ? 'outdoors' : loc === 'living_room' ? 'home' : 'studio');
+    // The seat matches the wooden set: apple boxes in the studio, the bench in the park, the sofa in the dollhouse.
+    const kind = loc ? locationSpec(loc).kind : s.env.mode === 'outdoor' ? 'open' : 'studio';
+    this.subject.apply(s.subject, kind === 'open' ? 'outdoors' : kind === 'room' ? 'home' : 'studio');
     this.subject.eyePosition(this.eye);
 
     this.camera.setFocalLength(s.camera.focalLength);
@@ -1171,7 +1173,7 @@ export class App {
       });
       P.showIf(bgd, () => s().env.mode === 'studio');
       const props = P.group(sec, 'Depth props');
-      const outdoors = () => s().env.mode === 'location' && locationSpec(s().env.location).proxy.kind === 'open';
+      const outdoors = () => s().env.mode === 'outdoor' || (s().env.mode === 'location' && locationSpec(s().env.location).kind === 'open');
       P.toggle(props, {
         label: 'Something in front',
         get: () => s().subject.foregroundProp,
@@ -1194,7 +1196,7 @@ export class App {
       P.segmented(sec, {
         options: [
           { value: 'studio', label: 'Studio', title: 'Seamless paper on stands in a real photo studio' },
-          { value: 'location', label: 'Location', title: 'Real places captured as HDRI panoramas' },
+          { value: 'location', label: 'Location', title: 'Real light from HDRI panoramas, around a wooden set' },
         ],
         get: () => s().env.mode,
         set: (v) => (s().env.mode = v),

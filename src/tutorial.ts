@@ -133,7 +133,7 @@ ${tip('on an outdoor shoot, try Tungsten for a blue, moody look.')}`,
     title: 'Scene: where you are',
     page: 'scene',
     target: pageBody,
-    body: `<p><strong>Studio</strong>: seamless paper on stands in a real photo studio, in any colour. <strong>Room light</strong> sets how much of the room's own light gets in. <strong>Location</strong>: thirteen real places, captured as panoramas. Where there is sun, <strong>Subject in shade</strong> gives you open shade.</p>
+    body: `<p><strong>Studio</strong>: seamless paper on stands in a wooden studio, in any colour. <strong>Room light</strong> sets how much of the room's own light gets in. <strong>Location</strong>: thirteen kinds of real light, captured as panoramas, around a wooden dollhouse room or a model park. Where there is sun, <strong>Subject in shade</strong> gives you open shade.</p>
 <p>Both are real surfaces, so your flash lights up the floor and nearby walls, and the background blurs by its real distance. <strong>Sun direction</strong> turns a location around the subject.</p>`,
   },
   {

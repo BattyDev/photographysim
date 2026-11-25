@@ -1,4 +1,6 @@
 // HDRI locations: Poly Haven panoramas (CC0) calibrated to real illuminance.
+// They light the scene; what you see around the subject is a wooden set
+// (dollworld.ts) chosen by the location's `kind`.
 //
 // On load each panorama is analysed once:
 //   • the sun (if any) is cut out of the image and returned as a direction,
@@ -7,8 +9,7 @@
 //     illuminance matches the location's target lux,
 //   • a coarse grid is kept so the light meter can integrate it for any normal.
 import * as THREE from 'three';
-import { loadHDR, loadTexture } from './assets';
-import { ProjectedLocation, type ProxyShape } from './projection';
+import { loadHDR } from './assets';
 import type { LocationId } from './state';
 
 export interface LocationSpec {
@@ -21,47 +22,44 @@ export interface LocationSpec {
   sun: boolean;
   /** Height of the panorama's camera above the ground (m). */
   height: number;
-  /** Surfaces the panorama is projected onto: open ground and a far dome, or the room it was shot in. */
-  proxy: ProxyShape;
+  /** Which wooden set stands around the subject: the studio, the dollhouse room or the park. */
+  kind: 'studio' | 'room' | 'open';
   /** Rough colour temperature of the light, for the white-balance hint. */
   kelvin: number;
   blurb: string;
 }
 
 export const LOCATIONS: LocationSpec[] = [
-  // Rooms measured from where the floor and ceiling meet the walls in each panorama.
-  { id: 'studio_loft', label: 'Photo studio loft', file: 'photo_studio_loft_hall_2k.hdr', lux: 250, sun: false, height: 1.6, proxy: { kind: 'room', x: [-2.3, 2.2], z: [-3.03, 2.52], ceiling: 3.48, yaw: 15 }, kelvin: 4800, blurb: 'Bright studio hall with big windows: soft, mixed ambient.' },
-  { id: 'workshop', label: 'Artist workshop', file: 'artist_workshop_2k.hdr', lux: 600, sun: false, height: 1.5, proxy: { kind: 'room', x: [-3.21, 1.9], z: [-3.59, 3.46], ceiling: 3.4, yaw: -30 }, kelvin: 5800, blurb: 'Interior lit by windows: classic soft, directional window light.' },
+  // Indoor light: the wooden studio or the dollhouse room stands around the subject.
+  { id: 'studio_loft', label: 'Studio, window-lit', file: 'photo_studio_loft_hall_2k.hdr', lux: 250, sun: false, height: 1.6, kind: 'studio', kelvin: 4800, blurb: 'Bright studio hall with big windows: soft, mixed ambient.' },
+  { id: 'workshop', label: 'Room, window light', file: 'artist_workshop_2k.hdr', lux: 600, sun: false, height: 1.5, kind: 'room', kelvin: 5800, blurb: 'Interior lit by windows: classic soft, directional window light.' },
   // A lounge in a country house: overcast daylight through a wall of windows,
-  // warm lamps in the room through the arch. The box is the main room; the
-  // capture point stands in the archway to the second room.
-  { id: 'living_room', label: 'Living room', file: 'lythwood_lounge_2k.hdr', lux: 300, sun: false, height: 1.6, proxy: { kind: 'room', x: [-3.5, 4.8], z: [-6, 7.7], ceiling: 3.1, yaw: 28 }, kelvin: 5000, blurb: 'A real lounge: soft overcast light through a wall of windows, warm lamps through the arch. Sofa, armchair and side tables for a family at home.' },
-  { id: 'meadow', label: 'Meadow, midday', file: 'meadow_2_2k.hdr', lux: 60000, sun: true, height: 1.6, proxy: { kind: 'open', radius: 80 }, kelvin: 5600, blurb: 'Hard high sun and a blue sky: the toughest light for portraits.' },
-  { id: 'sunset', label: 'Venice, sunset', file: 'venice_sunset_2k.hdr', lux: 1500, sun: true, height: 1.6, proxy: { kind: 'open', radius: 60 }, kelvin: 3200, blurb: 'Low warm sun skimming the water: golden-hour colour and long shadows.' },
-  { id: 'park_overcast', label: 'Tiergarten park', file: 'tiergarten_2k.hdr', lux: 12000, sun: false, height: 1.6, proxy: { kind: 'open', radius: 60 }, kelvin: 6500, blurb: 'Park under soft sky: gentle, even, flattering light.' },
-  // Added from Poly Haven (CC0). Lux is the horizontal illuminance a meter would read there;
-  // the open-proxy radius is roughly how far away the surroundings are.
-  { id: 'field_sunrise', label: 'Field, sunrise', file: 'bloem_field_sunrise_2k.hdr', lux: 900, sun: true, height: 1.6, proxy: { kind: 'open', radius: 90 }, kelvin: 3300, blurb: 'The sun right on the horizon across an open field: the classic golden-hour backlight.' },
-  { id: 'courtyard', label: 'City courtyard', file: 'urban_courtyard_2k.hdr', lux: 55000, sun: true, height: 1.6, proxy: { kind: 'open', radius: 26 }, kelvin: 5600, blurb: 'Bright sun between buildings. Turn on "Subject in shade" for open shade: soft light on the face, a sunny background.' },
-  { id: 'quadrangle', label: 'Quadrangle, midday', file: 'quadrangle_sunny_2k.hdr', lux: 50000, sun: true, height: 1.6, proxy: { kind: 'open', radius: 30 }, kelvin: 5500, blurb: 'High sun through thin cloud over a lawn and hedges: hard shadows from above. Needs fill.' },
-  { id: 'beach_overcast', label: 'Beach, under a bridge', file: 'beach_cloudy_bridge_2k.hdr', lux: 2500, sun: false, height: 1.6, proxy: { kind: 'open', radius: 20 }, kelvin: 6300, blurb: 'Overcast sky, with a bridge overhead blocking the top light: soft, directional light from the open sides.' },
-  { id: 'forest', label: 'Forest', file: 'forest_slope_2k.hdr', lux: 9000, sun: false, height: 1.6, proxy: { kind: 'open', radius: 14 }, kelvin: 6000, blurb: 'Under tall pines: soft green-tinted light, with trees at every distance for depth of field.' },
-  { id: 'street_night', label: 'Cobblestone street, night', file: 'cobblestone_street_night_2k.hdr', lux: 15, sun: false, height: 1.6, proxy: { kind: 'open', radius: 9 }, kelvin: 2400, blurb: 'Sodium street lamps and lit windows: warm, dim and full of bokeh. Bring a strobe.' },
-  { id: 'rooftop_night', label: 'City rooftop, night', file: 'rooftop_night_2k.hdr', lux: 12, sun: false, height: 1.7, proxy: { kind: 'open', radius: 40 }, kelvin: 3400, blurb: 'Dim city glow: bring your own light, and let the lights become bokeh.' },
+  // warm lamps in the room through the arch.
+  { id: 'living_room', label: 'Living room', file: 'lythwood_lounge_2k.hdr', lux: 300, sun: false, height: 1.6, kind: 'room', kelvin: 5000, blurb: 'Soft overcast light through a wall of windows, with warm lamps behind. Sofa, armchair and side tables for a family at home.' },
+  { id: 'meadow', label: 'Meadow, midday', file: 'meadow_2_2k.hdr', lux: 60000, sun: true, height: 1.6, kind: 'open', kelvin: 5600, blurb: 'Hard high sun and a blue sky: the toughest light for portraits.' },
+  { id: 'sunset', label: 'Sunset', file: 'venice_sunset_2k.hdr', lux: 1500, sun: true, height: 1.6, kind: 'open', kelvin: 3200, blurb: 'Low warm sun: golden-hour colour and long shadows.' },
+  { id: 'park_overcast', label: 'Park, overcast', file: 'tiergarten_2k.hdr', lux: 12000, sun: false, height: 1.6, kind: 'open', kelvin: 6500, blurb: 'Park under soft sky: gentle, even, flattering light.' },
+  // Added from Poly Haven (CC0). Lux is the horizontal illuminance a meter would read there.
+  { id: 'field_sunrise', label: 'Field, sunrise', file: 'bloem_field_sunrise_2k.hdr', lux: 900, sun: true, height: 1.6, kind: 'open', kelvin: 3300, blurb: 'The sun right on the horizon across an open field: the classic golden-hour backlight.' },
+  { id: 'courtyard', label: 'Bright sun, open shade', file: 'urban_courtyard_2k.hdr', lux: 55000, sun: true, height: 1.6, kind: 'open', kelvin: 5600, blurb: 'Bright high sun. Turn on "Subject in shade" for open shade: soft light on the face, a sunny background.' },
+  { id: 'quadrangle', label: 'Midday, thin cloud', file: 'quadrangle_sunny_2k.hdr', lux: 50000, sun: true, height: 1.6, kind: 'open', kelvin: 5500, blurb: 'High sun through thin cloud: hard shadows from above. Needs fill.' },
+  { id: 'beach_overcast', label: 'Overcast, under a bridge', file: 'beach_cloudy_bridge_2k.hdr', lux: 2500, sun: false, height: 1.6, kind: 'open', kelvin: 6300, blurb: 'Overcast sky, with a bridge overhead blocking the top light: soft, directional light from the open sides.' },
+  { id: 'forest', label: 'Under trees', file: 'forest_slope_2k.hdr', lux: 9000, sun: false, height: 1.6, kind: 'open', kelvin: 6000, blurb: 'Under tall pines: soft green-tinted light.' },
+  { id: 'street_night', label: 'Street lamps, night', file: 'cobblestone_street_night_2k.hdr', lux: 15, sun: false, height: 1.6, kind: 'open', kelvin: 2400, blurb: 'Sodium street lamps: warm and dim. Turn on the street lamps for bokeh, and bring a strobe.' },
+  { id: 'rooftop_night', label: 'City glow, night', file: 'rooftop_night_2k.hdr', lux: 12, sun: false, height: 1.7, kind: 'open', kelvin: 3400, blurb: 'Dim city glow: bring your own light, and let the lights become bokeh.' },
 ];
 
 export const locationSpec = (id: LocationId) => LOCATIONS.find((l) => l.id === id)!;
 
-const GW = 64;
-const GH = 32;
+export const HDRI_GRID = { w: 64, h: 32 };
+const GW = HDRI_GRID.w;
+const GH = HDRI_GRID.h;
 
 export interface HdriData {
   spec: LocationSpec;
   /** Panorama with the sun removed, scaled to cd/m². */
   texture: THREE.DataTexture;
   envMap: THREE.Texture;
-  /** The panorama on relightable surfaces at real distances. */
-  place: ProjectedLocation;
   /** Sun direction in panorama space (unit), or null. */
   sunDir: THREE.Vector3 | null;
   /** Sun illuminance on a surface facing it (lux) and its linear colour (luminance 1). */
@@ -230,39 +228,12 @@ export class HdriLibrary {
       tex.colorSpace = THREE.LinearSRGBColorSpace;
       const envMap = this.pmrem.fromEquirectangular(tex).texture;
       const { brightAz, ...rest } = a;
-      // Light each surface received when the photo was taken (panorama space).
-      const irradiance = (n: THREE.Vector3) => {
-        let e = 0;
-        for (const g of a.grid) e += g.e * Math.max(0, g.dir.dot(n));
-        if (a.sunDir) e += a.sunE * Math.max(0, a.sunDir.dot(n));
-        return e;
-      };
-      const place = new ProjectedLocation(tex, spec.height, spec.proxy, irradiance);
-      const data: HdriData = { spec, texture: tex, envMap, place, sunAzimuth: brightAz, ...rest };
+      const data: HdriData = { spec, texture: tex, envMap, sunAzimuth: brightAz, ...rest };
       this.ready.set(id, data);
       return data;
     });
     this.cache.set(id, p);
     return p;
-  }
-
-  /**
-   * Sharp photo of the panorama for fine detail: 8k where the GPU and screen
-   * can use it, 4k on phones. Loaded only once the location is in view.
-   */
-  async loadDetail(id: LocationId, renderer: THREE.WebGLRenderer): Promise<void> {
-    const data = await this.load(id);
-    const coarse = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
-    const big = renderer.capabilities.maxTextureSize >= 8192 && !coarse;
-    const tex = await loadTexture(`hdri/detail/${id}_${big ? '8k' : '4k'}.jpg`, true);
-    tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
-    tex.wrapS = THREE.RepeatWrapping;
-    data.place.setDetail(tex);
-  }
-
-  /** Free a location's sharp layer: an 8k photo holds ~170 MB of GPU memory. */
-  dropDetail(id: LocationId) {
-    this.ready.get(id)?.place.setDetail(null);
   }
 
   /**

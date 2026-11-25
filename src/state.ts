@@ -652,7 +652,7 @@ export const SCENARIO_PRESETS: Preset[] = [
   {
     id: 'shade',
     label: 'Open shade',
-    blurb: 'Step out of the sun into a building’s shadow: soft, even light on the face while the courtyard behind stays bright. The light is cool, so warm up the white balance.',
+    blurb: 'Step out of the sun into a building’s shadow: soft, even light on the face while the park behind stays bright. The light is cool, so warm up the white balance.',
     apply: (s) => {
       setLights(s, {});
       s.env = { ...s.env, inShade: true, mode: 'location', location: 'courtyard', sunAzimuth: 140 };

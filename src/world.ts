@@ -1,7 +1,9 @@
 // Studio, open-sky and HDRI-location environments, the daylight model, and depth props.
+// The HDRIs light the scene; the wooden sets in dollworld.ts are what you see around the subject.
 import * as THREE from 'three';
 import { Backdrop, MAX_BACKDROP_DISTANCE, paperWidth } from './backdrop';
-import { HdriLibrary, locationSpec, type HdriData } from './hdri';
+import { buildLivingRoom, buildPark, buildStudioRoom } from './dollworld';
+import { HDRI_GRID, HdriLibrary, locationSpec, type HdriData } from './hdri';
 import { kelvinToRGB, srgbToLinear } from './photo';
 import type { LocationId, SimState, Weather } from './state';
 import { loadFigure, type Poseable } from './subject';
@@ -33,6 +35,7 @@ export interface Daylight {
 const lerp = THREE.MathUtils.lerp;
 const smooth = THREE.MathUtils.smoothstep;
 const D = THREE.MathUtils.degToRad;
+const Y_UP = new THREE.Vector3(0, 1, 0);
 
 /** Linear RGB of a colour temperature, normalised to luminance 1. */
 export function kelvinLinear(k: number, out = new THREE.Color()): THREE.Color {
@@ -109,39 +112,38 @@ void main() {
   gl_FragColor = vec4(col, 1.0);
 }`;
 
-// ---------------------------------------------------------------- helpers
-
-function noiseTexture(base: string, spread: number, size = 256, blades = false): THREE.CanvasTexture {
-  const c = document.createElement('canvas');
-  c.width = c.height = size;
-  const g = c.getContext('2d')!;
-  g.fillStyle = base;
-  g.fillRect(0, 0, size, size);
-  const col = new THREE.Color(base);
-  for (let i = 0; i < size * size * 0.35; i++) {
-    const x = Math.random() * size;
-    const y = Math.random() * size;
-    const k = 1 + (Math.random() - 0.5) * spread;
-    g.fillStyle = `rgb(${(col.r * 255 * k) | 0},${(col.g * 255 * k) | 0},${(col.b * 255 * k) | 0})`;
-    if (blades) g.fillRect(x, y, 1, 2 + Math.random() * 3);
-    else g.fillRect(x, y, 1.5, 1.5);
-  }
-  const tex = new THREE.CanvasTexture(c);
-  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = 8;
-  return tex;
-}
-
 // ------------------------------------------------------------------ world
 
+type SetId = 'studio' | 'living' | 'park';
+const SETS: Record<SetId, () => THREE.Group> = { studio: buildStudioRoom, living: buildLivingRoom, park: buildPark };
+
+/** Linear RGB of a clear blue sky and a night sky, normalised to luminance 1. */
+const BLUE_SKY = new THREE.Color(0.32, 0.52, 1.0).multiplyScalar(1 / 0.512);
+const NIGHT_SKY = new THREE.Color(0.15, 0.2, 0.45).multiplyScalar(1 / 0.208);
+
 /**
- * Where the studio's room sits around the backdrop. The photo studio loft is
- * turned square to the set (−15° undoes its measured yaw) and moved so its
- * back wall stands just behind the paper stands. `back` and `cx` are its back
- * wall and centre line in that turned frame.
+ * Colours for the painted sky over the park, taken from the location's
+ * panorama: the luminance of its horizon and zenith (cd/m², upper quartile so
+ * trees and walls in the photo don't darken it), tinted by its light.
  */
-const STUDIO_ROOM = { rot: -15, back: -3.03, cx: -0.05, behindPaper: 0.75 };
+const skyCache = new WeakMap<HdriData, { zenith: THREE.Color; horizon: THREE.Color }>();
+function skyPaint(h: HdriData) {
+  let out = skyCache.get(h);
+  if (out) return out;
+  const cell = ((2 * Math.PI) / HDRI_GRID.w) * (Math.PI / HDRI_GRID.h);
+  const band = (lo: number, hi: number) => {
+    const ls = h.grid
+      .filter((g) => g.dir.y >= lo && g.dir.y < hi)
+      .map((g) => g.e / (cell * Math.sqrt(1 - g.dir.y * g.dir.y)))
+      .sort((a, b) => a - b);
+    return ls.length ? ls[Math.floor(ls.length * 0.75)] : 0;
+  };
+  const warm = kelvinLinear(h.spec.kelvin);
+  const zenith = h.spec.lux < 100 ? NIGHT_SKY.clone() : warm.clone().lerp(BLUE_SKY, h.spec.kelvin >= 4500 ? 0.85 : 0.45);
+  out = { horizon: warm.multiplyScalar(band(0.03, 0.25)), zenith: zenith.multiplyScalar(band(0.6, 1.01)) };
+  skyCache.set(h, out);
+  return out;
+}
 
 /** Layer seen only by the sun's shadow camera. */
 const SHADE_LAYER = 5;
@@ -161,8 +163,9 @@ export class World {
   readonly hemi = new THREE.HemisphereLight('#ffffff', '#ffffff', 1);
   readonly sky: THREE.Mesh<THREE.SphereGeometry, THREE.ShaderMaterial>;
   readonly backdrop = new Backdrop();
-  /** Holds the projected panorama surfaces of whichever place is showing (studio room or location). */
-  private placeRoot = new THREE.Group();
+  /** The wooden sets, each built the first time it is shown. */
+  private sets: Partial<Record<SetId, THREE.Group>> = {};
+  private setRoot = new THREE.Group();
   private plant = new THREE.Group();
   /** Outdoor depth props: a tree stump in front, a boulder behind. */
   private stump = new THREE.Group();
@@ -180,14 +183,11 @@ export class World {
   private figure: Poseable | null = null;
   private lamps = new THREE.Group();
   private lampBulbs: THREE.MeshStandardMaterial[] = [];
-  private place: THREE.Object3D | null = null;
   readonly hdri: HdriLibrary;
   private locInfo: LocationInfo | null = null;
   /** Asset groups already requested, so each is fetched only when first needed. */
   private requested = new Set<string>();
   private locSunDir: THREE.Vector3 | null = null;
-  /** Location whose sharp detail layer is loaded (only one at a time). */
-  private detailFor: LocationId | null = null;
   private bulbs: THREE.InstancedMesh;
   private bulbMat = new THREE.MeshBasicMaterial({ color: '#ffffff' });
   private bulbsStudio: THREE.Matrix4[] = [];
@@ -198,10 +198,10 @@ export class World {
 
   constructor(
     private scene: THREE.Scene,
-    private renderer: THREE.WebGLRenderer,
+    renderer: THREE.WebGLRenderer,
     private onAssetLoaded: () => void,
   ) {
-    scene.add(this.studio, this.outdoor, this.location, this.placeRoot, this.props, this.hemi, this.sun, this.sun.target);
+    scene.add(this.studio, this.outdoor, this.location, this.setRoot, this.props, this.hemi, this.sun, this.sun.target);
     this.hdri = new HdriLibrary(renderer);
 
     // Sky dome (follows the camera, always behind everything).
@@ -226,31 +226,10 @@ export class World {
     this.sky.scale.setScalar(500);
     this.sky.renderOrder = -10;
     this.sky.frustumCulled = false;
-    this.outdoor.add(this.sky);
+    scene.add(this.sky);
 
-    // Studio: a seamless paper backdrop on stands, inside the projected studio room.
+    // Studio: a seamless paper backdrop on stands, inside the wooden studio room.
     this.studio.add(this.backdrop.group);
-
-    // Outdoor ground and path.
-    const grassTex = noiseTexture('#3d5a2a', 0.6, 256, true);
-    grassTex.repeat.set(160, 160);
-    const ground = new THREE.Mesh(
-      new THREE.PlaneGeometry(400, 400),
-      new THREE.MeshStandardMaterial({ map: grassTex, roughness: 0.95 }),
-    );
-    ground.rotation.x = -Math.PI / 2;
-    ground.receiveShadow = true;
-    this.outdoor.add(ground);
-    const pathTex = noiseTexture('#9c9284', 0.35, 256);
-    pathTex.repeat.set(2, 40);
-    const path = new THREE.Mesh(
-      new THREE.PlaneGeometry(2.2, 90),
-      new THREE.MeshStandardMaterial({ map: pathTex, roughness: 0.95 }),
-    );
-    path.rotation.x = -Math.PI / 2;
-    path.position.set(0.3, 0.004, -40);
-    path.receiveShadow = true;
-    this.outdoor.add(path);
 
     // Sun.
     this.sun.castShadow = true;
@@ -400,29 +379,28 @@ export class World {
     );
   }
 
-  /** Show one place's projected surfaces (or none). */
-  private showPlace(h: HdriData | null) {
-    const g = h?.place.group ?? null;
-    if (this.place !== g) {
-      if (this.place) this.placeRoot.remove(this.place);
-      this.place = g;
-      if (g) this.placeRoot.add(g);
+  /** Show one wooden set (or none), building it the first time. */
+  private showSet(id: SetId | null) {
+    if (id && !this.sets[id]) {
+      const g = SETS[id]();
+      this.sets[id] = g;
+      this.setRoot.add(g);
     }
-    this.placeRoot.visible = !!g;
+    for (const k of Object.keys(this.sets) as SetId[]) this.sets[k]!.visible = k === id;
   }
 
-  /** Load a place's sharp detail layer once it is on screen. */
-  private wantDetail(id: LocationId) {
-    this.need(`detail:${id}`, () =>
-      this.hdri.loadDetail(id, this.renderer).then(() => {
-        // Moved on while it downloaded: don't keep it.
-        if (this.detailFor !== id) {
-          this.hdri.dropDetail(id);
-          this.requested.delete(`detail:${id}`);
-        }
-      }),
-    );
-    this.detailFor = id;
+  /** Paint the sky dome over the park from the location's panorama. */
+  private paintSky(h: HdriData, sunDir: THREE.Vector3 | null, cont: number) {
+    const u = this.sky.material.uniforms;
+    const p = skyPaint(h);
+    u.zenith.value.copy(p.zenith).multiplyScalar(cont);
+    u.horizon.value.copy(p.horizon).multiplyScalar(cont);
+    u.ground.value.setRGB(0.3, 0.4, 0.18).multiplyScalar(p.horizon.g * cont * 0.4);
+    const sun = !!sunDir && h.sunE > 0;
+    u.sunDir.value.copy(sunDir ?? Y_UP);
+    u.glow.value.copy(h.sunColor).multiplyScalar(sun ? p.horizon.g * cont * 1.5 : 0);
+    u.sunDisc.value.copy(h.sunColor).multiplyScalar(sun ? h.sunE * cont * 30 : 0);
+    u.glowPower.value = 6;
   }
 
   /** Panorama rotation (rad) that puts the location's sun at the chosen azimuth. */
@@ -467,19 +445,16 @@ export class World {
     this.locInfo = null;
     this.locSunDir = null;
 
-    // Keep only the visible location's sharp layer in GPU memory.
     const want: LocationId | null = mode === 'location' ? s.env.location : mode === 'studio' ? 'studio_loft' : null;
-    if (this.detailFor && this.detailFor !== want) {
-      this.hdri.dropDetail(this.detailFor);
-      this.requested.delete(`detail:${this.detailFor}`);
-      this.detailFor = null;
-    }
     if (want) this.need(`loc:${want}`, () => this.hdri.load(want));
-    if (!want) this.showPlace(null);
-    const outdoors = mode === 'location' && locationSpec(s.env.location).proxy.kind === 'open';
+    const kind = mode === 'location' ? locationSpec(s.env.location).kind : mode === 'studio' ? 'studio' : 'open';
+    this.showSet(kind === 'studio' ? 'studio' : kind === 'room' ? 'living' : 'park');
+    this.sky.visible = kind === 'open';
+    this.sky.position.copy(camera.position);
+    const outdoors = kind === 'open';
     if (s.subject.foregroundProp && !outdoors) this.need('plant', () => this.loadPlant());
     if (s.subject.foregroundProp && outdoors) this.need('stump', () => this.loadProp(wood.stump, this.stump, 0.9));
-    const home = mode === 'location' && s.env.location === 'living_room';
+    const home = kind === 'room';
     if (home) this.need('living', () => this.loadLivingSet());
     if (s.subject.picnic && outdoors) this.need('picnic', () => this.loadPicnic());
     if (s.subject.backgroundProp && outdoors) this.need('boulder', () => this.loadProp(wood.boulder, this.boulder, -0.5));
@@ -494,13 +469,7 @@ export class World {
       this.sun.visible = false;
       this.sun.castShadow = false;
       const room = this.hdri.get('studio_loft');
-      this.showPlace(room ?? null);
       if (room) {
-        // The room moves with the backdrop, so the subject can walk away from it.
-        const r = STUDIO_ROOM;
-        const roomLight = s.env.ambient / room.spec.lux;
-        room.place.update(cont * roomLight, D(r.rot), new THREE.Vector3(-r.cx, 0, bgZ - r.behindPaper - r.back));
-        this.wantDetail('studio_loft');
         this.scene.environment = room.envMap;
         this.scene.environmentIntensity = (s.env.ambient / room.spec.lux) * cont;
         this.scene.environmentRotation.set(0, 0, 0);
@@ -522,13 +491,10 @@ export class World {
         this.scene.background = new THREE.Color(0.02, 0.02, 0.025);
         this.sun.visible = false;
         this.sun.castShadow = false;
-        this.showPlace(null);
       } else {
         const rot = this.locationRotation(s, h);
-        this.showPlace(h);
-        this.wantDetail(s.env.location);
-        h.place.update(cont, rot);
-        this.scene.background = null;
+        // Indoors the dollhouse stands in a dark surround, like the studio; outdoors the sky is painted.
+        this.scene.background = kind === 'open' ? null : new THREE.Color(0.0008, 0.0008, 0.0008);
         this.scene.environment = h.envMap;
         this.scene.environmentIntensity = cont;
         this.scene.environmentRotation.set(0, rot, 0);
@@ -554,6 +520,7 @@ export class World {
             this.shadeCaster.visible = true;
           }
         }
+        if (kind === 'open') this.paintSky(h, this.locSunDir, cont);
         const el = h.sunDir ? THREE.MathUtils.radToDeg(Math.asin(h.sunDir.y)) : null;
         this.locInfo = { sunElevation: el, sunKelvin: h.spec.kelvin, lux: h.spec.lux };
       }
@@ -605,7 +572,6 @@ export class World {
       const discVisible = s.env.weather === 'overcast' ? 0 : smooth(el, -1, 0.5);
       u.sunDisc.value.copy(kelvinLinear(dl.sunK)).multiplyScalar(dl.sunE * cont * 30 * discVisible);
       u.glowPower.value = s.env.weather === 'hazy' ? 3 : 6;
-      this.sky.position.copy(camera.position);
 
       if (s.env.haze || s.env.weather === 'hazy') {
         const fogCol = hor.clone().multiplyScalar(L * 0.9);
@@ -617,7 +583,8 @@ export class World {
     this.sky.material.fog = false;
 
     // Props.
-    const open = mode !== 'studio';
+    // Outdoors the street lamps, string-light posts and background figure stand out in the park; in the studio and the dollhouse they stay near the back wall.
+    const open = kind === 'open';
     this.plant.visible = s.subject.foregroundProp && !outdoors;
     this.stump.visible = s.subject.foregroundProp && outdoors;
     this.boulder.visible = s.subject.backgroundProp && outdoors;
@@ -642,7 +609,7 @@ export class World {
     this.posts.visible = s.subject.bokehLights && open;
     this.cable.visible = s.subject.bokehLights;
     this.bulbs.count = bulbs.length;
-    const zOff = open ? 0 : bgZ + 0.35;
+    const zOff = open ? 0 : Math.max(bgZ + 0.35, kind === 'room' ? -3.1 : -Infinity);
     const m = new THREE.Matrix4();
     const pts: THREE.Vector3[] = [];
     bulbs.forEach((mat, i) => {
@@ -659,7 +626,7 @@ export class World {
 
   /** Meshes that can be double-clicked to set focus. */
   focusTargets(): THREE.Object3D[] {
-    return [this.studio, this.outdoor, this.placeRoot, this.props];
+    return [this.studio, this.setRoot, this.props];
   }
 }
 

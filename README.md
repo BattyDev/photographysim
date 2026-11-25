@@ -55,30 +55,32 @@ Built with Three.js + Vite + TypeScript. See [PLAN.md](PLAN.md) for the design b
 - **Environments**:
   - **Studio**: a seamless paper backdrop as it stands in a real studio: a
     2.72 m roll (3.55 m for groups) on a crossbar between two stands, hanging
-    down and sweeping across the floor, in any colour. It stands inside the
-    real Photo Studio Loft room, projected and relightable like the locations;
-    **Room light** sets how much of the room's own light gets in. The room
-    moves with the paper, so the subject can stand up to 4.5 m from it.
+    down and sweeping across the floor, in any colour. It stands in a plain
+    wooden studio (charcoal floor and walls, spare light stands, a rack of
+    backdrop rolls), lit by the real Photo Studio Loft panorama; **Room light**
+    sets how much of that light gets in. The subject can stand up to 4.5 m
+    from the paper.
   - **Open sky** (simulated sun and sky) is hidden for now: without realistic
     surroundings it was a flat plane. Its code stays wired up for when real
     outdoor settings arrive.
-  - **Location**: thirteen real HDRI panoramas, calibrated to real lux:
-    - indoors: studio loft, artist workshop, living room
-    - sun: meadow (midday), field at sunrise, city courtyard, quadrangle
-      (midday), Venice sunset
-    - soft light: Tiergarten park, beach under a bridge (overcast), forest
-    - night: cobblestone street, city rooftop
+  - **Location**: thirteen kinds of real light, from HDRI panoramas
+    calibrated to real lux:
+    - indoors: window-lit studio, room with window light, living room
+    - sun: meadow (midday), field at sunrise, bright sun with open shade,
+      midday through thin cloud, sunset
+    - soft light: park (overcast), under a bridge (overcast), under trees
+    - night: street lamps, city glow
 
     Each sun is extracted into a shadow-casting light you can rotate around the
     subject. **Subject in shade** (locations with a sun) blocks the sun from
     the subject and the ground around them, as a building would, while the
-    background stays sunny: open shade. The panorama is projected from where it was shot onto real
-    surfaces at real distances: a ground disc and far dome outdoors, and the
-    measured room (floor, walls, ceiling) indoors. Those surfaces are
-    relightable: flash brightens the floor and nearby walls by exactly what it
-    adds, they catch every light's shadow, and depth of field blurs them by
-    their true distance. A sharp 8k photo (4k on phones) adds fine detail on
-    top of the 2k HDR, loaded only for the location on screen.
+    background stays sunny: open shade. The panoramas only light the scene;
+    what you see is a wooden toy set built in code (`src/dollworld.ts`): an
+    open-front dollhouse living room for the indoor locations, and a
+    model-railway park (grass, a gravel path, lollipop trees, a picket fence,
+    toy houses) under a sky painted from the panorama's own colours outdoors.
+    Flash lights the set, it catches every light's shadow, and depth of field
+    blurs it by its true distance.
 - **Quick starts**: 8 lighting setups (Rembrandt, loop, butterfly, clamshell,
   split, rim, high-key, low-key) and 10 scenarios (studio, window light, family
   at home, golden hour, overcast, midday + fill flash, open shade, sunset +
@@ -135,8 +137,8 @@ Pushing to `main` deploys to GitHub Pages via `.github/workflows/pages.yml`.
 | `src/lights.ts` | Studio light rigs and per-light illuminance |
 | `src/softlight.ts` | Shader patch: area-light wrap, wider specular, soft PCF shadows |
 | `src/world.ts` | Studio cyc, open-sky sun model, location mode, props |
-| `src/hdri.ts` | HDRI locations: sun extraction, lux calibration, metering grid, room measurements |
-| `src/projection.ts` | Panorama projected onto relightable proxy surfaces, with the sharp detail layer |
+| `src/hdri.ts` | HDRI locations: sun extraction, lux calibration, metering grid |
+| `src/dollworld.ts` | The wooden sets: dollhouse living room, studio room, model-railway park |
 | `src/subject.ts` | Bone poses (on the mannequin), family group poses and seats, head scan, bust |
 | `src/woodwork.ts` | Wooden furniture and props built from boxes and cylinders, maple and walnut to match the mannequin |
 | `src/assets.ts` | glTF / texture / HDR loading helpers |

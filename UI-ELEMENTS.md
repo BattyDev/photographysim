@@ -211,10 +211,10 @@ The last page opened is saved in `localStorage` (`photographysim.page`) and reop
     - **Light level**: e.g. "85k lux" or "12 lux".
 - Location mode:
   - **Location**: select with 13 options.
-    - Photo studio loft, Artist workshop, Living room, Meadow (midday), Venice (sunset), Tiergarten park, Field (sunrise), City courtyard, Quadrangle (midday), Beach (under a bridge), Forest, Cobblestone street (night), City rooftop (night).
-    - In the 3D view, the panorama is drawn on real surfaces: a ground disc and far dome outdoors, and the room's floor, walls and ceiling indoors. Flash lights them and they catch shadows. A sharp 8k (or 4k on phones) layer fades in once downloaded.
+    - Studio (window-lit), Room (window light), Living room, Meadow (midday), Sunset, Park (overcast), Field (sunrise), Bright sun (open shade), Midday (thin cloud), Overcast (under a bridge), Under trees, Street lamps (night), City glow (night).
+    - The panorama lights the scene; the 3D view shows a wooden set: the studio room, the dollhouse living room (indoor locations) or the model park under a painted sky (outdoor locations).
   - **Hint**: one-line description of the chosen location.
-  - **Sun direction**: slider from −180° to 180°. Spins the whole panorama around the subject. Hint explains it.
+  - **Sun direction**: slider from −180° to 180°. Turns the light (and the sun) around the subject. Hint explains it.
   - **Subject in shade**: toggle, shown only for locations with a sun. Hint: a building blocks the sun from the subject; the background stays sunny.
   - **Readout box**:
     - **Sun**: "27° high", "no direct sun", or "loading…" while the panorama downloads.
