@@ -679,14 +679,14 @@ function house(s: HouseSpec, r: () => number): THREE.Group {
     const ridge = new THREE.Vector3(0, h + rise + 0.02, 0);
     const board = box('walnut', w + 0.6, 0.1, len, 0, 0, 0);
     board.position.copy(ridge).addScaledVector(dir, len / 2).addScaledVector(normal, 0.05);
-    board.rotation.x = -sz * pitch;
+    board.rotation.x = sz * pitch;
     parts.push(board);
     for (let i = 0; i < rows; i++) {
       const rl = len / rows + 0.08;
       const sh = box('walnut', w + 0.62, 0.05, rl, 0, 0, 0);
       sh.position.copy(ridge).addScaledVector(dir, (i + 0.5) * (len / rows) + 0.04).addScaledVector(normal, 0.118);
-      // Each row tips out a touch more than the slope: its lower edge stands proud over the next row, like a shingle course.
-      sh.rotation.x = -sz * (pitch + 0.03);
+      // Each row lies a touch flatter than the slope: its lower edge stands proud over the next row, like a shingle course.
+      sh.rotation.x = sz * (pitch - 0.03);
       sh.material = woodMaterial('walnut', 1.2);
       parts.push(sh);
     }
